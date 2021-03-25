@@ -604,9 +604,12 @@ set(SYSTEM_TESTS
     copy-archive-job
     copy-bscan
     copy-remote-bscan
+    dbcheck
     deprecation
     encrypt-signature
     encrypt-signature-tls-cert
+    fileset-multiple-include-blocks
+    fileset-multiple-options-blocks
     filesets
     list-backups
     multiplied-device
@@ -640,7 +643,6 @@ if(TARGET gfapi-fd
 else()
   list(APPEND SYSTEM_TESTS_DISABLED gfapi-fd)
 endif()
-
 
 # add tests also here that are unreliable they are excluded when running tests
 # during build in jenkins
