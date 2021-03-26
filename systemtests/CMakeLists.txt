@@ -672,9 +672,9 @@ if(AUTOCHANGER_DEVICES_FOUND)
 endif()
 
 if(AUTOCHANGER_TEST_ENABLED)
-  list(APPEND SYSTEM_TESTS autochanger)
+  list(APPEND SYSTEM_TESTS autochanger block-size)
 else()
-  list(APPEND SYSTEM_TESTS_DISABLED autochanger)
+  list(APPEND SYSTEM_TESTS_DISABLED autochanger block-size)
 endif()
 
 if(ndmp_data_agent_address)
@@ -1151,6 +1151,14 @@ if("ndmp" IN_LIST SYSTEM_TESTS)
   set_tests_properties(${SYSTEMTEST_PREFIX}ndmp PROPERTIES TIMEOUT 300)
 else()
   list(APPEND SYSTEM_TESTS_DISABLED ndmp)
+endif()
+
+if(AUTOCHANGER_TEST_ENABLED)
+  # Make sure these tests run sequentially.
+  set_tests_properties(
+    ${SYSTEMTEST_PREFIX}autochanger ${SYSTEMTEST_PREFIX}block-size
+    PROPERTIES RESOURCE_LOCK autochanger_resource
+  )
 endif()
 
 # webui specific settings
