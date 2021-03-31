@@ -146,3 +146,13 @@ LANG=en_US.UTF-8
 
 # path to real postgres binaries, NOT debian wrappers
 POSTGRES_BIN_PATH=@POSTGRES_BIN_PATH@
+
+
+export BAREOS_DIR_MEMCHECK="valgrind --leak-check=full --log-file=$(pwd)/memcheck-DIR.log"
+export BAREOS_SD_MEMCHECK="valgrind --leak-check=full --log-file=$(pwd)/memcheck-SD.log"
+export BAREOS_FD_MEMCHECK="valgrind --leak-check=full --log-file=$(pwd)/memcheck-FD.log"
+
+#export BAREOS_DIR_MEMCHECK="drmemory -logdir $(pwd) -- "
+#export BAREOS_SD_MEMCHECK="drmemory -logdir $(pwd) -- "
+#export BAREOS_FD_MEMCHECK="drmemory -logdir $(pwd) -- "
+
