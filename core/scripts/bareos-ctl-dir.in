@@ -48,8 +48,7 @@ case "$1" in
             if [ $? != 0 ]; then
                 exit 1
             fi
-
-            "${BAREOS_DIRECTOR_BINARY}" -v $2 $3 ${OPTIONS}
+            ${BAREOS_DIR_MEMCHECK} "${BAREOS_DIRECTOR_BINARY}" -v $2 $3 ${OPTIONS}
         fi
         ;;
 

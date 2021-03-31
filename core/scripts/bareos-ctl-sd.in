@@ -43,11 +43,7 @@ case "$1" in
                 OPTIONS="${OPTIONS} -c ${BAREOS_CONFIG_DIR}"
             fi
 
-            if [ "x${VALGRIND_SD}" = "x1" ]; then
-                valgrind --leak-check=full ${BAREOS_STORAGEDAEMON_BINARY} -v $2 $3 ${OPTIONS}
-            else
-                ${BAREOS_STORAGEDAEMON_BINARY} -v $2 $3 ${OPTIONS}
-            fi
+            ${BAREOS_SD_MEMCHECK} "${BAREOS_STORAGEDAEMON_BINARY}" -v $2 $3 ${OPTIONS}
         fi
         ;;
 
