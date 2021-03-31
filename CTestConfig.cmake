@@ -1,6 +1,6 @@
 #   BAREOS® - Backup Archiving REcovery Open Sourced
 #
-#   Copyright (C) 2019-2019 Bareos GmbH & Co. KG
+#   Copyright (C) 2019-2021 Bareos GmbH & Co. KG
 #
 #   This program is Free Software; you can redistribute it and/or
 #   modify it under the terms of version three of the GNU Affero General Public
@@ -31,3 +31,7 @@ set(CTEST_DROP_METHOD "https")
 set(CTEST_DROP_SITE "cdash.bareos.org")
 set(CTEST_DROP_LOCATION "/submit.php?project=Bareos")
 set(CTEST_DROP_SITE_CDASH TRUE)
+
+set(MEMORYCHECK_COMMAND_OPTIONS
+    "--leak-check=yes --num-callers=50 --leak-check=full --show-leak-kinds=all"
+)
