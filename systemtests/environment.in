@@ -148,9 +148,9 @@ LANG=en_US.UTF-8
 POSTGRES_BIN_PATH=@POSTGRES_BIN_PATH@
 
 
-export BAREOS_DIR_MEMCHECK="valgrind --leak-check=full --log-file=$(pwd)/memcheck-DIR-%p-${TestName}.log"
-export BAREOS_SD_MEMCHECK="valgrind --leak-check=full --log-file=$(pwd)/memcheck-SD-%p-${TestName}.log"
-export BAREOS_FD_MEMCHECK="valgrind --leak-check=full --log-file=$(pwd)/memcheck-FD-%p-${TestName}.log"
+export BAREOS_DIR_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck-DIR-%p-${TestName}.log"
+export BAREOS_SD_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck-SD-%p-${TestName}.log"
+export BAREOS_FD_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck-FD-%p-${TestName}.log"
 
 #export BAREOS_DIR_MEMCHECK="drmemory -logdir $(pwd) -- "
 #export BAREOS_SD_MEMCHECK="drmemory -logdir $(pwd) -- "

@@ -231,6 +231,7 @@ macro(prepare_testdir_for_daemon_run)
   set(config_directory_dir_additional_test_config
       ${current_test_directory}/etc/bareos/bareos-dir.d/additional_test_config
   )
+  set(memcheckdir ${current_test_directory}/memcheck)
   set(logdir ${current_test_directory}/log)
   set(tmpdir ${current_test_directory}/tmp)
   set(tmp ${tmpdir})
@@ -267,6 +268,7 @@ macro(prepare_testdir_for_daemon_run)
   endif()
 
   file(MAKE_DIRECTORY ${piddir})
+  file(MAKE_DIRECTORY ${memcheckdir})
   file(MAKE_DIRECTORY ${tmpdir})
   file(MAKE_DIRECTORY ${archivedir})
   file(MAKE_DIRECTORY ${logdir})
