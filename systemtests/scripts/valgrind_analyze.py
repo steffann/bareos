@@ -41,6 +41,7 @@ results["TOTALS"]["indirectly_lost_bytes"] = 0
 results["TOTALS"]["indirectly_lost_blocks"] = 0
 results["TOTALS"]["still_reachable_bytes"] = 0
 results["TOTALS"]["still_reachable_blocks"] = 0
+results["TOTALS"]["files_scanned"] = 0
 
 for root, dirs, files in os.walk(b".", topdown=False):
     for name in files:
@@ -58,6 +59,7 @@ for root, dirs, files in os.walk(b".", topdown=False):
             if not daemon in results[testname]:
                 results[testname][daemon] = dict()
             file = open(os.path.join(root, name))
+            results["TOTALS"]["files_scanned"] += 1
             for line in file:
                 deflostm = deflost.match(line)
                 indlostm = indlost.match(line)
