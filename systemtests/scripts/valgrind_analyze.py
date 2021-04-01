@@ -5,7 +5,10 @@ import os
 import re
 import json
 
-regex = re.compile(b"memcheck__(?P<testname>[^_]*)__(?P<daemon>[^-]*)-.*.log")
+
+filename_ctest_regex = re.compile(b"MemoryChecker.(?P<testnumber>[0-9]+).log$")
+
+filename_regex = re.compile(b"memcheck__(?P<testname>[^_]*)__(?P<daemon>[^-]*)-.*.log$")
 
 deflost = re.compile(
     ".*definitely lost: (?P<bytes>[0-9,.]*) bytes in (?P<blocks>[0-9,.]*) blocks"
@@ -41,14 +44,20 @@ results["TOTALS"]["still_reachable_blocks"] = 0
 
 for root, dirs, files in os.walk(b".", topdown=False):
     for name in files:
-        match = regex.match(name)
+        match = filename_regex.match(name)
+        match_ctest = filename_ctest_regex.match(name)
         if match:
             testname = match.group("testname").decode()
             daemon = match.group("daemon").decode()
+        if match_ctest:
+            testname = match_ctest.group("testnumber").decode()
+            daemon = "testbinary"
+        if match or match_ctest:
             if not testname in results:
                 results[testname] = dict()
             if not daemon in results[testname]:
                 results[testname][daemon] = dict()
+            print("opening: ".encode() + os.path.join(root, name))
             file = open(os.path.join(root, name))
             for line in file:
                 deflostm = deflost.match(line)
