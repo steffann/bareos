@@ -57,7 +57,6 @@ for root, dirs, files in os.walk(b".", topdown=False):
                 results[testname] = dict()
             if not daemon in results[testname]:
                 results[testname][daemon] = dict()
-            print("opening: ".encode() + os.path.join(root, name))
             file = open(os.path.join(root, name))
             for line in file:
                 deflostm = deflost.match(line)
