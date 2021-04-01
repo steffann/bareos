@@ -490,6 +490,7 @@ unsigned int dpl_hmac(const char* key_buf,
   HMAC_Init_ex(ctx, key_buf, key_len, md, NULL);
   HMAC_Update(ctx, (u_char*)data_buf, data_len);
   HMAC_Final(ctx, (u_char*)digest_buf, &digest_len);
+  HMAC_CTX_free(ctx);
 #endif
 
   return digest_len;
