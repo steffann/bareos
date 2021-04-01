@@ -2218,6 +2218,7 @@ static int PyRestorePacket_init(PyRestorePacket* self,
  */
 static void PyRestorePacket_dealloc(PyRestorePacket* self)
 {
+  if (self->statp) { Py_XDECREF(self->statp); }
   PyObject_Del(self);
 }
 
