@@ -1,7 +1,7 @@
 /*
    BAREOS® - Backup Archiving REcovery Open Sourced
 
-   Copyright (C) 2016-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2016-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -112,6 +112,11 @@ ConnectionPool::ConnectionPool()
 
 ConnectionPool::~ConnectionPool()
 {
+  for (int i = connections_->size() - 1; i >= 0; i--) {
+    Connection* connection = (Connection*)connections_->get(i);
+    connections_->remove(i);
+    delete (connection);
+  }
   delete (connections_);
   pthread_mutex_destroy(&add_mutex_);
   pthread_cond_destroy(&add_cond_var_);
@@ -119,10 +124,8 @@ ConnectionPool::~ConnectionPool()
 
 void ConnectionPool::cleanup()
 {
-  Connection* connection = nullptr;
-  int i = 0;
-  for (i = connections_->size() - 1; i >= 0; i--) {
-    connection = (Connection*)connections_->get(i);
+  for (int i = connections_->size() - 1; i >= 0; i--) {
+    Connection* connection = (Connection*)connections_->get(i);
     Dmsg2(800, "checking connection %s (%d)\n", connection->name(), i);
     if (!connection->check()) {
       Dmsg2(120, "connection %s (%d) is terminated => removed\n",
