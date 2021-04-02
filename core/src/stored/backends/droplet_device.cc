@@ -1056,7 +1056,8 @@ bool DropletDevice::d_truncate(DeviceControlRecord* dcr)
 DropletDevice::~DropletDevice()
 {
   if (ctx_) {
-    if (bucketname_ && ctx_->cur_bucket) {
+    // if (bucketname_ && ctx_->cur_bucket) {
+    if (ctx_->cur_bucket) {
       free(ctx_->cur_bucket);
       ctx_->cur_bucket = NULL;
     }

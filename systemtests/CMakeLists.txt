@@ -359,27 +359,27 @@ option(RUN_SYSTEMTESTS_ON_INSTALLED_FILES
 )
 
 set(ALL_BINARIES_BEING_USED_BY_SYSTEMTESTS
-    bareos-dir
     bareos-dbcheck
+    bareos-dbcopy
+    bareos-dir
     bareos-fd
     bareos-sd
-    bareos-dbcopy
-    bcopy
-    btape
-    bextract
     bareos-sd
-    bls
-    bscan
     bconsole
-    bsmtp
-    bwild
+    bcopy
+    bextract
+    bls
     bpluginfo
-    bsmtp
+    bregex
+    bscan
     bscrypto
+    bsmtp
+    bsmtp
+    btape
     btestls
+    bwild
     drivetype
     fstype
-    bregex
 )
 if(TARGET bareos_vadp_dumper)
   list(APPEND ALL_BINARIES_BEING_USED_BY_SYSTEMTESTS bareos_vadp_dumper)

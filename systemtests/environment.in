@@ -64,6 +64,7 @@ export BAREOS_BSCAN_BINARY=@BSCAN_BINARY@
 export BAREOS_BLS_BINARY=@BLS_BINARY@
 export BAREOS_BCONSOLE_BINARY=@BCONSOLE_BINARY@
 export BAREOS_DBCOPY_BINARY=@BAREOS_DBCOPY_BINARY@
+export BAREOS_BTAPE_BINARY=@BTAPE_BINARY@
 
 
 
@@ -151,6 +152,10 @@ POSTGRES_BIN_PATH=@POSTGRES_BIN_PATH@
 export BAREOS_DIR_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__DIR-%p.log"
 export BAREOS_SD_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__SD-%p.log"
 export BAREOS_FD_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__FD-%p.log"
+export BAREOS_BSCAN_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BSCAN-%p.log"
+export BAREOS_BTAPE_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BTAPE-%p.log"
+export BAREOS_BCONSOLE_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BCONSOLE-%p.log"
+export BAREOS_BLS_MEMCHECK="valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BLS-%p.log"
 
 #export BAREOS_DIR_MEMCHECK="drmemory -logdir $(pwd) -- "
 #export BAREOS_SD_MEMCHECK="drmemory -logdir $(pwd) -- "

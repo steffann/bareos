@@ -48,7 +48,7 @@ echo "Starting bareos"
 start_bareos
 
 echo "Set debug on the Tape-Storage daemon"
-tracefile="$(echo "setdebug level=200 trace=1 storage=Tape-0" | bin/bconsole | grep "^3000" | awk -F"tracefile=" '{print $2}' )"
+tracefile="$(echo "setdebug level=200 trace=1 storage=Tape-0" | ${BAREOS_BCONSOLE_MEMCHECK} ${BAREOS_BCONSOLE_BINARY} | grep "^3000" | awk -F"tracefile=" '{print $2}' )"
 : > "${tracefile}" # clear tracefile
 
 echo "Label barcodes"
@@ -56,7 +56,7 @@ for i in $(seq ${NUMBER_OF_POOLS}); do
   pool=$(( i -1 )) #counts from 0
   for j in $(seq ${NUMBER_OF_TAPES_PER_POOL}); do
     slot=$(( j + pool * NUMBER_OF_TAPES_PER_POOL )) #counts from 1
-    echo "label barcodes slot=${slot} drive=0 pool=Full-${pool} storage=Tape-0 yes" | bin/bconsole | grep "OK label"
+    echo "label barcodes slot=${slot} drive=0 pool=Full-${pool} storage=Tape-0 yes" | ${BAREOS_BCONSOLE_MEMCHECK} ${BAREOS_BCONSOLE_BINARY} | grep "OK label"
   done
 done
 
@@ -86,12 +86,12 @@ echo "wait" >> bconsole_backup_jobs
 echo "messages" >> bconsole_backup_jobs
 
 # start all the jobs
-bin/bconsole < bconsole_backup_jobs
+${BAREOS_BCONSOLE_MEMCHECK} ${BAREOS_BCONSOLE_BINARY} < bconsole_backup_jobs
 
 # prepare the restore
 
 list_of_jobids=$(echo "list jobs" \
-  | bin/bconsole \
+  | ${BAREOS_BCONSOLE_MEMCHECK} ${BAREOS_BCONSOLE_BINARY} \
   | grep "backup-bareos-fd" \
   | sed 's/| *\([0-9]\{1,\}\).*$/\1/')
 
@@ -113,7 +113,7 @@ echo "wait" >> bconsole_restore_jobs
 echo "messages" >> bconsole_restore_jobs
 
 # start all the restore jobs
-bin/bconsole < bconsole_restore_jobs
+${BAREOS_BCONSOLE_MEMCHECK} ${BAREOS_BCONSOLE_BINARY} < bconsole_restore_jobs
 
 check_for_zombie_jobs storage=Tape-0
 
