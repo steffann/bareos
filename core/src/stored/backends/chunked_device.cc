@@ -145,9 +145,9 @@ void ChunkedDevice::FreeChunkIoRequest(chunk_io_request* request)
 bool ChunkedDevice::StartIoThreads()
 {
   char ed1[50];
-  uint8_t thread_nr;
-  pthread_t thread_id;
-  thread_handle* handle;
+  uint8_t thread_nr{};
+  pthread_t thread_id{};
+  thread_handle* handle{};
 
   /*
    * Create a new ordered circular buffer for exchanging chunks between
