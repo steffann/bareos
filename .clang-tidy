@@ -53,7 +53,7 @@ Checks: >
 # -readability-redundant-declaration
 
 # Turn all the warnings from the checks above into errors.
-WarningsAsErrors: "*"
+#WarningsAsErrors: "*"
 
 HeaderFilterRegex: "(google/cloud/|generator/).*\\.h$"
 
