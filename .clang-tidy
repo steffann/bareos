@@ -31,7 +31,7 @@
 #      trigger a redundant declaration warning from this check.
 #
 Checks: >
-  -*,readability-identifier-naming
+  -*, modernize-use-nullptr
 # bugprone-*,
 # google-*,
 # misc-*,
