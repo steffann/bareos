@@ -9,14 +9,16 @@
 namespace fs = std::filesystem;
 std::regex filenameregex(R"(MemoryChecker\.([0-9]+)\.log)");
 
-std::regex def_lost_regex(
+std::regex definitely_lost_regex(
     R"(.*definitely lost: ([0-9]+) bytes in ([0-9]*) blocks)");
 
-std::regex def_lost_regex(
-    R"(.*definitely lost: ([0-9]+) bytes in ([0-9]*) blocks)");
+std::regex possibly_lost_regex(
+    R"(.*possibly lost: ([0-9]+) bytes in ([0-9]*) blocks)");
 
 int main()
 {
+  int total_def_lost_bytes{};
+  int total_pos_lost_bytes{};
   Json::Value root = {};
   for (const auto& p : fs::recursive_directory_iterator(".")) {
     std::cmatch m;
@@ -30,14 +32,20 @@ int main()
       auto file = std::ifstream((p.path()));
       while (std::getline(file, line)) {
         std::cmatch n;
-        if (std::regex_search(line.c_str(), n, def_lost_regex)) {
-          /* std::cout << line << std::endl; */
-          /* std::cout << n[1] << " " << n[2] << std::endl; */
-          root[testnumber]["definitely_lost"] = n[1].str();
-          root[testnumber]["possibly_lost"] = n[2].str();
+        if (std::regex_search(line.c_str(), n, definitely_lost_regex)) {
+          root[testnumber]["definitely_lost_bytes"] = n[1].str();
+          total_def_lost_bytes += std::stoi(n[1].str());
+          root[testnumber]["definitely_lost_blocks"] = n[2].str();
+        }
+        if (std::regex_search(line.c_str(), n, possibly_lost_regex)) {
+          root[testnumber]["possibly_lost_bytes"] = n[1].str();
+          total_pos_lost_bytes += std::stoi(n[1].str());
+          root[testnumber]["possibly_lost_blocks"] = n[2].str();
         }
       }
     }
+    root["TOTALS"]["definitely_lost_bytes"] = total_def_lost_bytes;
+    root["TOTALS"]["possibly_lost_bytes"] = total_pos_lost_bytes;
   }
   std::cout << root;
 }
