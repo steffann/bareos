@@ -24,6 +24,26 @@ cmake_policy(SET CMP0057 NEW) # IF(.. IN_LIST ..)
 cmake_policy(SET CMP0053 NEW)
 cmake_policy(SET CMP0064 NEW) # IF(TEST ...)
 
+option(RUN_BINARIES_IN_VALGRIND "run binaries in valgrind in systemtests" "no")
+
+if(RUN_BINARIES_IN_VALGRIND)
+  set(BINARIES_MEMCHECK_SETTINGS
+      "
+export BAREOS_DIR_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__DIR-%p.log\"
+export BAREOS_SD_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__SD-%p.log\"
+export BAREOS_FD_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__FD-%p.log\"
+export BAREOS_BSCAN_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BSCAN-%p.log\"
+export BAREOS_BTAPE_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BTAPE-%p.log\"
+export BAREOS_BCONSOLE_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BCONSOLE-%p.log\"
+export BAREOS_BLS_MEMCHECK=\"valgrind --leak-check=full --log-file=memcheck/memcheck__${TestName}__BLS-%p.log\"
+"
+  )
+else()
+  set(BINARIES_MEMCHECK_SETTINGS "")
+endif()
+
+message(STATUS "BINARIES_MEMCHECK_SETTINGS: ${BINARIES_MEMCHECK_SETTINGS}")
+
 # create a variable BINARY_NAME_TO_TEST for each binary name bareos-dir ->
 # BAREOS_DIR_TO_TEST bconsole -> BCONSOLE_TO_TEST
 macro(create_variable_BINARY_NAME_TO_TEST_for_binary_name binary_name)
