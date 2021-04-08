@@ -1106,7 +1106,9 @@ foreach(TEST_NAME ${SYSTEM_TESTS})
     )
   endif()
 
-  set_tests_properties(${SYSTEMTEST_PREFIX}${TEST_NAME} PROPERTIES TIMEOUT 90)
+  set_tests_properties(
+    ${SYSTEMTEST_PREFIX}${TEST_NAME} PROPERTIES TIMEOUT 90 COST 1
+  )
   math(EXPR BASEPORT "${BASEPORT} + 10")
 
 endforeach()
