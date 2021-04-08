@@ -1054,6 +1054,14 @@ else()
   set(TEST_INFO_TEXT "running system tests on the sourcetree")
 endif()
 
+# Enlarge timeout when doing sanitize or valgrind tests
+if((RUN_BINARIES_IN_VALGRIND) OR (${CMAKE_CXX_FLAGS} MATCHES "sanitize"))
+  set(TESTTIMEOUT 270)
+  message(STATUS "Timeout is ${TESTTIMEOUT} for sanitize or valgrind")
+else()
+  set(TESTTIMEOUT 90)
+endif()
+
 foreach(TEST_NAME ${SYSTEM_TESTS})
 
   message(STATUS "Configuring test: ${SYSTEMTEST_PREFIX}${TEST_NAME}")
@@ -1105,10 +1113,8 @@ foreach(TEST_NAME ${SYSTEM_TESTS})
       ${SYSTEMTEST_PREFIX}${TEST_NAME} PROPERTIES LABELS "broken"
     )
   endif()
-
   set_tests_properties(
-    ${SYSTEMTEST_PREFIX}${TEST_NAME}
-    PROPERTIES TIMEOUT $<IF:$<BOOL:${RUN_BINARIES_IN_VALGRIND}>,180,90> COST 1
+    ${SYSTEMTEST_PREFIX}${TEST_NAME} PROPERTIES TIMEOUT ${TESTTIMEOUT} COST 1
   )
   math(EXPR BASEPORT "${BASEPORT} + 10")
 
