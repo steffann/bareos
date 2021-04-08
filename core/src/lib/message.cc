@@ -1614,7 +1614,7 @@ void Qmsg(JobControlRecord* jcr, int type, utime_t mtime, const char* fmt, ...)
     break;
   }
 
-  item = (MessageQueueItem*)malloc(sizeof(MessageQueueItem));
+  item = new (malloc(sizeof(MessageQueueItem))) MessageQueueItem;
   item->type_ = type;
   item->mtime_ = time(NULL);
   item->msg_ = new std::string(buf.c_str());
