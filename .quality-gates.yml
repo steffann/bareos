@@ -1,5 +1,17 @@
 ---
 # quality gates to configure Jenkins build pipeline
+
+sanitizeMem:
+  ctest_unstable: 41
+
+sanitizeThread:
+  ctest_unstable: 65
+
+valgrind:
+  min_files_scanned: 484
+  max_lost_blocks: 208
+  max_lost_blocks: 135598
+
 coverage:
   lines:
     healthy: 70
