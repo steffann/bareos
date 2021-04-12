@@ -15,6 +15,10 @@ export estat
 #shellcheck source=../scripts/reload_test_functions
 . "${rscripts}"/reload_test_functions
 
+export BAREOS_SKIP_DB_SETUP=yes
+${rscripts}/setup
+
+
 export temporary_job_config_file="$config_directory_dir_additional_test_config/new_empty_job_definition.conf"
 export bconsole_command_file="$tmp/bconsole_reload_command"
 export console_logfile="$tmp/console.log"
@@ -26,22 +30,14 @@ export director_debug_level=""
 start_test
 ############################################
 
-#be sure no director is started
-stop_director
+rm -f "$config_directory_dir_additional_test_config/"*
 
-#cleanup possible leftover from last run
-${rscripts}/cleanup
-remove_console_logfile
-
-${rscripts}/setup
 start_director
-
 #reload modified config
 add_empty_job_to_config
 test_reload_will_not_crash_director
 find_error_string_in_console_log 'Config error: Name not specified for resource'
 
-stop_director
 
 ############################################
 end_test

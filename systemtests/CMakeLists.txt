@@ -296,9 +296,14 @@ macro(prepare_test)
 
   # db parameters
   set(db_password "")
-  # db_name is regress-${TEST_NAME} replacing - by _
-  string(REPLACE "-" "_" db_name "regress-${TEST_NAME}")
-  # set(db_name "regress-${TEST_NAME}")
+  # reload tests use common database and have common fixtures
+  if(TEST_NAME MATCHES ".*reload.*")
+    string(REPLACE "-" "_" db_name "common-reload-test-db")
+  else()
+    # db_name is regress-${TEST_NAME} replacing - by _
+    string(REPLACE "-" "_" db_name "regress-${TEST_NAME}")
+  endif()
+
   set(db_user "regress")
   set(db_address "$current_test_directory/database/tmp")
 
@@ -593,32 +598,34 @@ endforeach()
 
 set(tests_dir ${PROJECT_BINARY_DIR}/tests)
 set(SYSTEM_TESTS
-    client-initiated
-    config-dump
-    encrypt-signature
-    encrypt-signature-tls-cert
-    filesets
-    notls
-    passive
-    spool
     bareos
     bareos-acl
-    bscan
     bconsole-status-client
+    bscan
+    client-initiated
+    config-dump
     config-syntax-crash
     copy-archive-job
     copy-bscan
     copy-remote-bscan
     deprecation
+    encrypt-signature
+    encrypt-signature-tls-cert
+    filesets
     list-backups
     multiplied-device
+    notls
+    passive
     reload-add-client
     reload-add-duplicate-job
     reload-add-empty-job
     reload-add-second-director
     reload-add-uncommented-string
     reload-unchanged-config
+    reload_cleanup
+    reload_setup
     scheduler-backup
+    spool
     upgrade-database
     virtualfull
     virtualfull-bscan
@@ -1083,10 +1090,32 @@ foreach(TEST_NAME ${SYSTEM_TESTS})
     )
   endif()
 
+  if(TEST_NAME MATCHES ".*reload-.*")
+    message(
+      STATUS
+        "setting FIXTURES SETUP for ${SYSTEMTEST_PREFIX}${TEST_NAME} to system:setup and system:cleanup"
+    )
+    set_tests_properties(
+      ${SYSTEMTEST_PREFIX}${TEST_NAME}
+      PROPERTIES FIXTURES_REQUIRED "reload_setup;reload_cleanup" RESOURCE_LOCK
+                 reload_common_lock
+    )
+  endif()
+
+  if(TEST_NAME MATCHES ".*reload.*")
+    message(STATUS "Keeping baseport ${BASEPORT} for test ${TEST_NAME}")
+  else()
+    math(EXPR BASEPORT "${BASEPORT} + 10")
+  endif()
   set_tests_properties(${SYSTEMTEST_PREFIX}${TEST_NAME} PROPERTIES TIMEOUT 300)
-  math(EXPR BASEPORT "${BASEPORT} + 10")
 
 endforeach()
+set_tests_properties(
+  ${SYSTEMTEST_PREFIX}reload_setup PROPERTIES FIXTURES_SETUP reload_setup
+)
+set_tests_properties(
+  ${SYSTEMTEST_PREFIX}reload_cleanup PROPERTIES FIXTURES_CLEANUP reload_cleanup
+)
 
 # webui specific settings
 if(ENABLE_WEBUI_SELENIUM_TEST)

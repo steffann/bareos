@@ -15,6 +15,9 @@ export estat
 #shellcheck source=../scripts/reload_test_functions
 . "${rscripts}"/reload_test_functions
 
+export BAREOS_SKIP_DB_SETUP=yes
+${rscripts}/setup
+
 
 bconsole_command_file="$tmp/bconsole_reload_command"
 console_logfile="$tmp/console.log"
@@ -26,11 +29,6 @@ director_debug_level=""
 ############################################
 start_test
 ############################################
-
-stop_director #be sure no director is started
-
-${rscripts}/cleanup
-${rscripts}/setup
 
 start_director
 
