@@ -114,6 +114,7 @@ if(Python2_FOUND)
   if(NOT "${Python2_CCSHARED}" STREQUAL "")
     target_compile_options(bareosfd-python2-module PUBLIC ${Python2_CCSHARED})
   endif()
+  target_compile_options(bareosfd-python2-module PRIVATE -fno-strict-aliasing)
   target_link_libraries(bareosfd-python2-module bareos ${Python2_LIBRARIES})
 
   add_test(NAME bareosfd-python2-module
