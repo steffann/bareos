@@ -156,12 +156,13 @@ void dpl_set_addr_family_from_host(const char* host, char* new_host, int* af)
 
   host_len = strlen(host);
   if (host_len >= 2 && host[0] == '[' && host[host_len - 1] == ']') {
-    strncpy(new_host, host + 1, host_len - 2);
+    memmove(new_host, host + 1, host_len - 2);
     new_host[host_len - 2] = '\0';
 
     *af = AF_INET6;
   } else {
-    strncpy(new_host, host, host_len);
+    memmove(new_host, host, host_len);
+    new_host[host_len] = '\0';
 
     *af = AF_INET;
   }
