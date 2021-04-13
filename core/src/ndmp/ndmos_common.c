@@ -89,7 +89,7 @@ void ndmos_sync_config_info(struct ndm_session* sess)
    * give CONTROL via NDMPv2 a chance to recognize this
    * implementation (no ndmp2_config_get_server).
    */
-  snprintf(osbuf, sizeof(osbuf), "%s (running %s from %s)", unam.sysname,
+  snprintf(osbuf, sizeof(osbuf), "%.100s (running %s from %s)", unam.sysname,
            NDMOS_CONST_PRODUCT_NAME, NDMOS_CONST_VENDOR_NAME);
 
   sess->config_info->hostname = unam.nodename;
