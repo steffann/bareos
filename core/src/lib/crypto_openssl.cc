@@ -1609,6 +1609,7 @@ void OpensslPostErrors(JobControlRecord* jcr, int type, const char* errstring)
  *  Returns: thread ID
  *
  */
+[[maybe_unused]]
 static unsigned long GetOpensslThreadId(void)
 {
 #  ifdef HAVE_WIN32
@@ -1627,7 +1628,7 @@ static unsigned long GetOpensslThreadId(void)
 /*
  * Allocate a dynamic OpenSSL mutex
  */
-static struct CRYPTO_dynlock_value* openssl_create_dynamic_mutex(
+[[maybe_unused]] static struct CRYPTO_dynlock_value* OpensslCreateDynamicMutex(
     const char* file,
     int line)
 {
@@ -1646,6 +1647,7 @@ static struct CRYPTO_dynlock_value* openssl_create_dynamic_mutex(
   return dynlock;
 }
 
+[[maybe_unused]]
 static void OpensslUpdateDynamicMutex(int mode,
                                       struct CRYPTO_dynlock_value* dynlock,
                                       const char* file,
@@ -1658,6 +1660,8 @@ static void OpensslUpdateDynamicMutex(int mode,
   }
 }
 
+
+[[maybe_unused]]
 static void OpensslDestroyDynamicMutex(struct CRYPTO_dynlock_value* dynlock,
                                        const char* file,
                                        int line)
@@ -1676,7 +1680,8 @@ static void OpensslDestroyDynamicMutex(struct CRYPTO_dynlock_value* dynlock,
 /*
  * (Un)Lock a static OpenSSL mutex
  */
-static void openssl_update_static_mutex(int mode,
+[[maybe_unused]]
+static void OpensslUpdateStaticMutex(int mode,
                                         int i,
                                         const char* file,
                                         int line)
@@ -1715,10 +1720,10 @@ int OpensslInitThreads(void)
   }
 
   /* Set static locking callback */
-  CRYPTO_set_locking_callback(openssl_update_static_mutex);
+  CRYPTO_set_locking_callback(OpensslUpdateStaticMutex);
 
   /* Initialize dyanmic locking */
-  CRYPTO_set_dynlock_create_callback(openssl_create_dynamic_mutex);
+  CRYPTO_set_dynlock_create_callback(OpensslCreateDynamicMutex);
   CRYPTO_set_dynlock_lock_callback(OpensslUpdateDynamicMutex);
   CRYPTO_set_dynlock_destroy_callback(OpensslDestroyDynamicMutex);
 
