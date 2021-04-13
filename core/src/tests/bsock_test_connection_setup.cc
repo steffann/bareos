@@ -1,7 +1,7 @@
 /*
    BAREOS® - Backup Archiving REcovery Open Sourced
 
-   Copyright (C) 2018-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2018-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -48,16 +48,18 @@ bool DoReloadConfig() { return false; }
 
 static void InitSignalHandler()
 {
+#if !defined(HAVE_WIN32)
   struct sigaction sig = {};
   sig.sa_handler = SIG_IGN;
   sigaction(SIGUSR2, &sig, nullptr);
   sigaction(SIGPIPE, &sig, nullptr);
+#endif
 }
 
 static void InitGlobals()
 {
   OSDependentInit();
-#if HAVE_WIN32
+#if defined(HAVE_WIN32)
   WSA_Init();
 #endif
   directordaemon::my_config = nullptr;
