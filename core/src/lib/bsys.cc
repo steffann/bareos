@@ -496,7 +496,13 @@ void CreatePidFile(char* dir, const char* progname, int port)
   if ((pidfd = open(fname, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, 0640))
       >= 0) {
     len = sprintf(pidbuf, "%d\n", (int)getpid());
-    write(pidfd, pidbuf, len);
+    if (len != write(pidfd, pidbuf, len)) {
+      close(pidfd);
+      del_pid_file_ok = true; /* we created it so we can delete it */
+      BErrNo be;
+      Emsg2(M_ERROR_TERM, 0, _("Could not write pid file. %s ERR=%s\n"), fname,
+            be.bstrerror());
+    }
     close(pidfd);
     del_pid_file_ok = true; /* we created it so we can delete it */
   } else {
