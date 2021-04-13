@@ -2,7 +2,7 @@
    BAREOS® - Backup Archiving REcovery Open Sourced
 
    Copyright (C) 2011-2012 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -340,7 +340,11 @@ void DumpCryptoCache(int fd)
   len = Mmsg(msg, "%-*s %-*s %-20s %-20s\n", max_vol_length, _("Volumename"),
              max_key_length, _("EncryptionKey"), _("Added"), _("Expires"));
 
-  write(fd, msg.c_str(), len);
+  if (len != write(fd, msg.c_str(), len)) {
+    BErrNo be;
+    Emsg2(M_ERROR_TERM, 0, _("Could not write to crypto cache ERR=%s\n"),
+          be.bstrerror());
+  }
 
   foreach_dlist (cce, cached_crypto_keys) {
     bstrutime(dt1, sizeof(dt1), cce->added);
@@ -348,7 +352,11 @@ void DumpCryptoCache(int fd)
     len = Mmsg(msg, "%-*s %-*s %-20s %-20s\n", max_vol_length, cce->VolumeName,
                max_key_length, cce->EncryptionKey, dt1, dt2);
 
-    write(fd, msg.c_str(), len);
+    if (len != write(fd, msg.c_str(), len)) {
+      BErrNo be;
+      Emsg2(M_ERROR_TERM, 0, _("Could not write to crypto cache ERR=%s\n"),
+            be.bstrerror());
+    }
   }
 
   V(crypto_cache_lock);
