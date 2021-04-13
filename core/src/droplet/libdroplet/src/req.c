@@ -148,14 +148,17 @@ dpl_status_t dpl_req_set_resource(dpl_req_t* req, const char* resource)
 
   if (resource == NULL || *resource == '\0' || !strcmp(resource, "/")) {
     if (!strcmp(req->ctx->base_path, "/")) {
-      if (!req->ctx->preserve_root_path)
+      if (!req->ctx->preserve_root_path) {
         npath[0] = '\0';
-      else
+      } else {
         strncpy(npath, resource, sizeof(npath));
+        npath[sizeof(npath) - 1] = '\0';
+      }
     } else {
-      if (!req->ctx->preserve_root_path)
+      if (!req->ctx->preserve_root_path) {
         strncpy(npath, req->ctx->base_path, sizeof(npath));
-      else {
+        npath[sizeof(npath) - 1] = '\0';
+      } else {
         snprintf(npath, sizeof(npath), "%s%s", req->ctx->base_path, resource);
       }
     }
