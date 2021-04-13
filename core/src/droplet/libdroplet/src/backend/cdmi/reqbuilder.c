@@ -89,7 +89,7 @@ dpl_status_t dpl_cdmi_add_sysmd_to_req(const dpl_sysmd_t* sysmd, dpl_req_t* req)
 
   if (sysmd->mask & DPL_SYSMD_MASK_SIZE) {
     /* optional (computed remotely by storage) */
-    snprintf(buf, sizeof(buf), "%ld", sysmd->size);
+    snprintf(buf, sizeof(buf), "%" PRId64, sysmd->size);
 
     ret2 = dpl_dict_add(tmp_dict, "cdmi_size", buf, 0);
     if (DPL_SUCCESS != ret2) {
@@ -344,7 +344,8 @@ dpl_status_t dpl_cdmi_req_add_range(dpl_req_t* req,
   } else {
     char buf[256];
 
-    snprintf(buf, sizeof(buf), "value:%lu-%lu", range->start, range->end);
+    snprintf(buf, sizeof(buf), "value:%" PRIu64 "-%" PRIu64, range->start,
+             range->end);
     ret2 = dpl_req_set_subresource(req, buf);
     if (DPL_SUCCESS != ret2) {
       ret = ret2;

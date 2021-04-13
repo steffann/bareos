@@ -45,6 +45,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <libgen.h>
+#include <inttypes.h>
 
 /** @file */
 
@@ -123,14 +124,14 @@ dpl_status_t dpl_posix_head_raw(dpl_ctx_t* ctx,
     goto end;
   }
 
-  snprintf(buf, sizeof(buf), "%ld", st.st_dev);
+  snprintf(buf, sizeof(buf), "%" PRId64, st.st_dev);
   ret2 = dpl_dict_add(metadata, "dev", buf, 0);
   if (DPL_SUCCESS != ret2) {
     ret = ret2;
     goto end;
   }
 
-  snprintf(buf, sizeof(buf), "%lX", st.st_ino);
+  snprintf(buf, sizeof(buf), "%" PRIX64, st.st_ino);
   ret2 = dpl_dict_add(metadata, "ino", buf, 0);
   if (DPL_SUCCESS != ret2) {
     ret = ret2;
@@ -144,7 +145,7 @@ dpl_status_t dpl_posix_head_raw(dpl_ctx_t* ctx,
     goto end;
   }
 
-  snprintf(buf, sizeof(buf), "%ld", st.st_nlink);
+  snprintf(buf, sizeof(buf), "%" PRId64, st.st_nlink);
   ret2 = dpl_dict_add(metadata, "nlink", buf, 0);
   if (DPL_SUCCESS != ret2) {
     ret = ret2;
@@ -165,14 +166,14 @@ dpl_status_t dpl_posix_head_raw(dpl_ctx_t* ctx,
     goto end;
   }
 
-  snprintf(buf, sizeof(buf), "%lu", st.st_rdev);
+  snprintf(buf, sizeof(buf), "%" PRIu64, st.st_rdev);
   ret2 = dpl_dict_add(metadata, "rdev", buf, 0);
   if (DPL_SUCCESS != ret2) {
     ret = ret2;
     goto end;
   }
 
-  snprintf(buf, sizeof(buf), "%lu", st.st_size);
+  snprintf(buf, sizeof(buf), "%" PRIu64, st.st_size);
   ret2 = dpl_dict_add(metadata, "size", buf, 0);
   if (DPL_SUCCESS != ret2) {
     ret = ret2;
@@ -186,7 +187,7 @@ dpl_status_t dpl_posix_head_raw(dpl_ctx_t* ctx,
     goto end;
   }
 
-  snprintf(buf, sizeof(buf), "%lu", st.st_blocks);
+  snprintf(buf, sizeof(buf), "%" PRIu64, st.st_blocks);
   ret2 = dpl_dict_add(metadata, "blocks", buf, 0);
   if (DPL_SUCCESS != ret2) {
     ret = ret2;

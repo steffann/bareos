@@ -77,7 +77,8 @@ void dpl_sysmd_print(dpl_sysmd_t* sysmd, FILE* f)
     fprintf(f, "storage_class=%s\n",
             dpl_storage_class_str(sysmd->storage_class));
 
-  if (sysmd->mask & DPL_SYSMD_MASK_SIZE) fprintf(f, "size=%lu\n", sysmd->size);
+  if (sysmd->mask & DPL_SYSMD_MASK_SIZE)
+    fprintf(f, "size=%" PRIu64 "\n", sysmd->size);
 
   if (sysmd->mask & DPL_SYSMD_MASK_ATIME)
     fprintf(f, "atime=%lu\n", sysmd->atime);
