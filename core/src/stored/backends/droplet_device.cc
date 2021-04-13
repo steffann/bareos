@@ -222,8 +222,7 @@ bool DropletDevice::ForEachChunkInDirectoryRunCallback(
     bool ignore_gaps)
 {
   bool retval = true;
-  dpl_status_t status;
-  dpl_status_t callback_status;
+  dpl_status_t callback_status{DPL_SUCCESS};
   PoolMem path(PM_NAME);
 
   bool found = true;
@@ -234,10 +233,10 @@ bool DropletDevice::ForEachChunkInDirectoryRunCallback(
     path.bsprintf("%s/%04d", dirname, i);
 
     auto sysmd = dpl_sysmd_dup(&sysmd_);
-    status = dpl_getattr(ctx_,         /* context */
-                         path.c_str(), /* locator */
-                         nullptr,      /* metadata */
-                         sysmd);       /* sysmd */
+    const dpl_status_t status = dpl_getattr(ctx_,         /* context */
+                                            path.c_str(), /* locator */
+                                            nullptr,      /* metadata */
+                                            sysmd);       /* sysmd */
 
     switch (status) {
       case DPL_SUCCESS:
