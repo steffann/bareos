@@ -958,7 +958,8 @@ ssize_t ChunkedDevice::WriteChunked(int fd, const void* buffer, size_t count)
             memcpy(current_chunk_->buffer + wanted_offset,
                    ((char*)buffer + offset), bytes_left);
             offset_ += bytes_left;
-            if ((wanted_offset + bytes_left) > current_chunk_->buflen) {
+            if ((wanted_offset + bytes_left)
+                > static_cast<ssize_t>(current_chunk_->buflen)) {
               current_chunk_->buflen = wanted_offset + bytes_left;
             }
             current_chunk_->need_flushing = true;

@@ -447,7 +447,7 @@ typedef enum
   FILL_ZERO
 } fill_mode_t;
 
-static void FillBuffer(fill_mode_t mode, char* buf, uint32_t len)
+static void FillBuffer(fill_mode_t mode, char* buf, ssize_t len)
 {
   int fd;
   switch (mode) {
