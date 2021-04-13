@@ -309,10 +309,9 @@ dpl_status_t dpl_posix_list_bucket(dpl_ctx_t* ctx,
 {
   DIR* dir = NULL;
   dpl_status_t ret, ret2;
-  int iret;
   char path[MAXPATHLEN];
   char objpath[MAXPATHLEN];
-  struct dirent entry, *entryp;
+  struct dirent* entryp;
   struct stat st;
   dpl_vec_t* common_prefixes = NULL;
   dpl_vec_t* objects = NULL;
@@ -350,14 +349,19 @@ dpl_status_t dpl_posix_list_bucket(dpl_ctx_t* ctx,
   }
 
   while (1) {
-    iret = readdir_r(dir, &entry, &entryp);
-    if (0 != iret) {
-      ret = dpl_posix_map_errno();
-      perror("readdir");
-      goto end;
-    }
+    errno = 0;
+    entryp = readdir(dir);
 
-    if (!entryp) break;
+    if (!entryp) {
+      if (errno) {
+        ret = dpl_posix_map_errno();
+        perror("readdir");
+        goto end;
+      } else {
+        // no error: out of records
+        break;
+      }
+    }
 
     if (!strcmp(entryp->d_name, ".") || !strcmp(entryp->d_name, "..")) continue;
 
@@ -401,8 +405,7 @@ dpl_status_t dpl_posix_list_bucket(dpl_ctx_t* ctx,
 
       snprintf(objpath, sizeof(objpath), "/%s/%s",
                ctx->base_path ? ctx->base_path : "", object->path);
-      iret = stat(objpath, &st);
-      if (0 != iret) {
+      if (0 != stat(objpath, &st)) {
         // It might be a broken link -> ENOENT, not an error, size=0
         if (errno != ENOENT) {
           // Do not map errno here, since it makes the whole listing fail,
