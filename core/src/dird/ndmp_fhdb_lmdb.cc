@@ -48,7 +48,7 @@ struct fhdb_payload {
   char namebuffer[1];
 };
 
-struct fhdb_state {
+struct fhdb_lmdb_state {
   uint64_t root_node;
   POOLMEM* pay_load;
   POOLMEM* lmdb_name;
@@ -85,7 +85,7 @@ extern "C" int bndmp_fhdb_lmdb_add_dir(struct ndmlog* ixlog,
     int total_length;
     MDB_val key, data;
     struct fhdb_payload* payload;
-    struct fhdb_state* fhdb_state = (struct fhdb_state*)nis->fhdb_state;
+    struct fhdb_lmdb_state* fhdb_state = (struct fhdb_lmdb_state*)nis->fhdb_state;
 
     Dmsg3(100, "{ \"%s\", %llu , %llu},\n", raw_name, dir_node, node);
     Dmsg3(100,
@@ -178,7 +178,7 @@ extern "C" int bndmp_fhdb_lmdb_add_node(struct ndmlog* ixlog,
     int result;
     MDB_val key, data;
     struct fhdb_payload* payload;
-    struct fhdb_state* fhdb_state = (struct fhdb_state*)nis->fhdb_state;
+    struct fhdb_lmdb_state* fhdb_state = (struct fhdb_lmdb_state*)nis->fhdb_state;
 
     Dmsg1(100, "{ NULL, %llu , 0},\n", node);
     Dmsg1(debuglevel, "bndmp_fhdb_lmdb_add_node node:[%llu]\n", node);
@@ -352,7 +352,7 @@ extern "C" int bndmp_fhdb_lmdb_add_dirnode_root(struct ndmlog* ixlog,
     int total_length;
     MDB_val key, data;
     struct fhdb_payload* payload;
-    struct fhdb_state* fhdb_state = (struct fhdb_state*)nis->fhdb_state;
+    struct fhdb_lmdb_state* fhdb_state = (struct fhdb_lmdb_state*)nis->fhdb_state;
 
     Dmsg1(100, "{ NULL, 0, %llu },\n", root_node);
     Dmsg1(100, "bndmp_fhdb_lmdb_add_dirnode_root: New root node [%llu]\n",
@@ -451,13 +451,13 @@ void NdmpFhdbLmdbRegister(struct ndmlog* ixlog)
     int result;
     ssize_t mapsize = 10485760;
     NIS* nis = (NIS*)ixlog->ctx;
-    struct fhdb_state* fhdb_state;
+    struct fhdb_lmdb_state* fhdb_state;
 
     /*
      * Initiate LMDB environment
      */
-    fhdb_state = (struct fhdb_state*)malloc(sizeof(struct fhdb_state));
-    memset(fhdb_state, 0, sizeof(struct fhdb_state));
+    fhdb_state = (struct fhdb_lmdb_state*)malloc(sizeof(struct fhdb_lmdb_state));
+    memset(fhdb_state, 0, sizeof(struct fhdb_lmdb_state));
 
     fhdb_state->lmdb_name = GetPoolMemory(PM_FNAME);
     fhdb_state->pay_load = GetPoolMemory(PM_MESSAGE);
@@ -563,7 +563,7 @@ void NdmpFhdbLmdbRegister(struct ndmlog* ixlog)
 void NdmpFhdbLmdbUnregister(struct ndmlog* ixlog)
 {
   NIS* nis = (NIS*)ixlog->ctx;
-  struct fhdb_state* fhdb_state = (struct fhdb_state*)nis->fhdb_state;
+  struct fhdb_lmdb_state* fhdb_state = (struct fhdb_lmdb_state*)nis->fhdb_state;
 
   ndmfhdb_unregister_callbacks(ixlog);
 
@@ -607,7 +607,7 @@ void NdmpFhdbLmdbUnregister(struct ndmlog* ixlog)
   }
 }
 
-static inline void CalculatePath(uint64_t node, fhdb_state* fhdb_state)
+static inline void CalculatePath(uint64_t node, struct fhdb_lmdb_state* fhdb_state)
 {
   PoolMem temp;
   int result = 0;
@@ -651,7 +651,7 @@ static inline void CalculatePath(uint64_t node, fhdb_state* fhdb_state)
   }
 }
 
-static inline void ProcessLmdb(NIS* nis, struct fhdb_state* fhdb_state)
+static inline void ProcessLmdb(NIS* nis, struct fhdb_lmdb_state* fhdb_state)
 {
   int result;
   uint64_t node;
@@ -719,7 +719,7 @@ static inline void ProcessLmdb(NIS* nis, struct fhdb_state* fhdb_state)
 void NdmpFhdbLmdbProcessDb(struct ndmlog* ixlog)
 {
   NIS* nis = (NIS*)ixlog->ctx;
-  struct fhdb_state* fhdb_state = (struct fhdb_state*)nis->fhdb_state;
+  struct fhdb_lmdb_state* fhdb_state = (struct fhdb_lmdb_state*)nis->fhdb_state;
 
   if (!fhdb_state) { return; }
 

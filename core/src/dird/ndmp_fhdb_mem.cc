@@ -113,7 +113,7 @@ struct ooo_metadata {
 };
 typedef struct ooo_metadata OOO_MD;
 
-struct fhdb_state {
+struct fhdb_mem_state {
   N_TREE_ROOT* fhdb_root;
   htable* out_of_order_metadata;
 };
@@ -449,7 +449,7 @@ static inline void add_out_of_order_metadata(NIS* nis,
   N_TREE_NODE* nt_node;
   OOO_MD* md_entry = NULL;
   htable* meta_data
-      = ((struct fhdb_state*)nis->fhdb_state)->out_of_order_metadata;
+      = ((struct fhdb_mem_state*)nis->fhdb_state)->out_of_order_metadata;
 
   nt_node = ndmp_fhdb_new_tree_node(fhdb_root);
   nt_node->inode = node;
@@ -474,7 +474,7 @@ static inline void add_out_of_order_metadata(NIS* nis,
 
     meta_data = (htable*)malloc(sizeof(htable));
     meta_data->init(md_entry, &md_entry->link, nr_items, nr_pages);
-    ((struct fhdb_state*)nis->fhdb_state)->out_of_order_metadata = meta_data;
+    ((struct fhdb_mem_state*)nis->fhdb_state)->out_of_order_metadata = meta_data;
   }
 
   /*
@@ -511,7 +511,7 @@ extern "C" int bndmp_fhdb_mem_add_dir(struct ndmlog* ixlog,
     Dmsg3(100, "bndmp_fhdb_mem_add_dir: New filename ==> %s [%llu] - [%llu]\n",
           raw_name, dir_node, node);
 
-    fhdb_root = ((struct fhdb_state*)nis->fhdb_state)->fhdb_root;
+    fhdb_root = ((struct fhdb_mem_state*)nis->fhdb_state)->fhdb_root;
     if (!fhdb_root) {
       Jmsg(nis->jcr, M_FATAL, 0,
            _("NDMP protocol error, FHDB add_dir call before "
@@ -676,11 +676,11 @@ extern "C" int bndmp_fhdb_mem_add_node(struct ndmlog* ixlog,
     N_TREE_NODE* wanted_node;
     PoolMem attribs(PM_FNAME);
     htable* meta_data
-        = ((struct fhdb_state*)nis->fhdb_state)->out_of_order_metadata;
+        = ((struct fhdb_mem_state*)nis->fhdb_state)->out_of_order_metadata;
 
     Dmsg1(100, "bndmp_fhdb_mem_add_node: New node [%llu]\n", node);
 
-    fhdb_root = ((struct fhdb_state*)nis->fhdb_state)->fhdb_root;
+    fhdb_root = ((struct fhdb_mem_state*)nis->fhdb_state)->fhdb_root;
     if (!fhdb_root) {
       Jmsg(nis->jcr, M_FATAL, 0,
            _("NDMP protocol error, FHDB add_node call before add_dir.\n"));
@@ -694,13 +694,13 @@ extern "C" int bndmp_fhdb_mem_add_node(struct ndmlog* ixlog,
                "metadata.\n"));
         meta_data->destroy();
         free(meta_data);
-        ((struct fhdb_state*)nis->fhdb_state)->out_of_order_metadata = NULL;
+        ((struct fhdb_mem_state*)nis->fhdb_state)->out_of_order_metadata = NULL;
         return 1;
       }
 
       meta_data->destroy();
       free(meta_data);
-      ((struct fhdb_state*)nis->fhdb_state)->out_of_order_metadata = NULL;
+      ((struct fhdb_mem_state*)nis->fhdb_state)->out_of_order_metadata = NULL;
     }
 
     wanted_node = find_tree_node(fhdb_root, node);
@@ -741,12 +741,12 @@ extern "C" int bndmp_fhdb_mem_add_dirnode_root(struct ndmlog* ixlog,
 
   if (nis->save_filehist) {
     N_TREE_ROOT* fhdb_root;
-    struct fhdb_state* fhdb_state;
+    struct fhdb_mem_state* fhdb_state;
 
     Dmsg1(100, "bndmp_fhdb_mem_add_dirnode_root: New root node [%llu]\n",
           root_node);
 
-    fhdb_state = ((struct fhdb_state*)nis->fhdb_state);
+    fhdb_state = ((struct fhdb_mem_state*)nis->fhdb_state);
     fhdb_root = fhdb_state->fhdb_root;
     if (fhdb_root) {
       Jmsg(nis->jcr, M_FATAL, 0,
@@ -792,8 +792,8 @@ void NdmpFhdbMemRegister(struct ndmlog* ixlog)
   fhdb_callbacks.add_dirnode_root = bndmp_fhdb_mem_add_dirnode_root;
   ndmfhdb_register_callbacks(ixlog, &fhdb_callbacks);
 
-  nis->fhdb_state = malloc(sizeof(struct fhdb_state));
-  memset(nis->fhdb_state, 0, sizeof(struct fhdb_state));
+  nis->fhdb_state = malloc(sizeof(struct fhdb_mem_state));
+  memset(nis->fhdb_state, 0, sizeof(struct fhdb_mem_state));
 }
 
 void NdmpFhdbMemUnregister(struct ndmlog* ixlog)
@@ -802,7 +802,7 @@ void NdmpFhdbMemUnregister(struct ndmlog* ixlog)
   if (nis && nis->fhdb_state) {
     N_TREE_ROOT* fhdb_root;
 
-    fhdb_root = ((struct fhdb_state*)nis->fhdb_state)->fhdb_root;
+    fhdb_root = ((struct fhdb_mem_state*)nis->fhdb_state)->fhdb_root;
     if (fhdb_root) { NdmpFhdbFreeTree(fhdb_root); }
 
     free(nis->fhdb_state);
@@ -816,9 +816,9 @@ void NdmpFhdbMemProcessDb(struct ndmlog* ixlog)
 {
   N_TREE_ROOT* fhdb_root;
   NIS* nis = (NIS*)ixlog->ctx;
-  struct fhdb_state* fhdb_state;
+  struct fhdb_mem_state* fhdb_state;
 
-  fhdb_state = ((struct fhdb_state*)nis->fhdb_state);
+  fhdb_state = ((struct fhdb_mem_state*)nis->fhdb_state);
   fhdb_root = fhdb_state->fhdb_root;
   if (fhdb_root) {
     if (nis->jcr->ar) {
