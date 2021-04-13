@@ -374,6 +374,28 @@ static void TerminateBtape(int status)
 }
 
 
+static bool write_or_fail(int fd, void* buf, size_t count)
+{
+  size_t bytes_written = write(fd, buf, count);
+  if (bytes_written != count) {
+    Pmsg2(-1, "wrote only %u of %u bytes during write()", &bytes_written,
+          &count);
+    return false;
+  }
+  return true;
+}
+
+static bool read_or_fail(int fd, void* buf, size_t count)
+{
+  size_t bytes_read = read(fd, buf, count);
+  if (bytes_read != count) {
+    Pmsg2(-1, "expected %u bytes from read(), got %u", &count, &bytes_read);
+    return false;
+  }
+  return true;
+}
+
+
 btime_t total_time = 0;
 uint64_t total_size = 0;
 
@@ -430,11 +452,8 @@ static void FillBuffer(fill_mode_t mode, char* buf, uint32_t len)
   int fd;
   switch (mode) {
     case FILL_RANDOM:
-      fd = open("/dev/urandom", O_RDONLY);
-      if (fd != -1) {
-        read(fd, buf, len);
-        close(fd);
-      } else {
+      if ((fd = open("/dev/urandom", O_RDONLY)) == -1
+          || len != read(fd, buf, len) || close(fd) == -1) {
         uint32_t* p = (uint32_t*)buf;
         srandom(time(NULL));
         for (uint32_t i = 0; i < len / sizeof(uint32_t); i++) {
@@ -2313,17 +2332,17 @@ static void fillcmd()
 
   sprintf(buf, "%s/btape.state", working_directory);
   fd = open(buf, O_CREAT | O_TRUNC | O_WRONLY, 0640);
-  if (fd >= 0) {
-    write(fd, &btape_state_level, sizeof(btape_state_level));
-    write(fd, &simple, sizeof(simple));
-    write(fd, &last_block_num1, sizeof(last_block_num1));
-    write(fd, &last_block_num2, sizeof(last_block_num2));
-    write(fd, &last_file1, sizeof(last_file1));
-    write(fd, &last_file2, sizeof(last_file2));
-    write(fd, last_block1->buf, last_block1->buf_len);
-    write(fd, last_block2->buf, last_block2->buf_len);
-    write(fd, first_block->buf, first_block->buf_len);
-    close(fd);
+  if (fd >= 0
+      && write_or_fail(fd, &btape_state_level, sizeof(btape_state_level))
+      && write_or_fail(fd, &simple, sizeof(simple))
+      && write_or_fail(fd, &last_block_num1, sizeof(last_block_num1))
+      && write_or_fail(fd, &last_block_num2, sizeof(last_block_num2))
+      && write_or_fail(fd, &last_file1, sizeof(last_file1))
+      && write_or_fail(fd, &last_file2, sizeof(last_file2))
+      && write_or_fail(fd, last_block1->buf, last_block1->buf_len)
+      && write_or_fail(fd, last_block2->buf, last_block2->buf_len)
+      && write_or_fail(fd, first_block->buf, first_block->buf_len)
+      && close(fd) == 0) {
     Pmsg2(0, _("Wrote state file last_block_num1=%d last_block_num2=%d\n"),
           last_block_num1, last_block_num2);
   } else {
@@ -2363,6 +2382,7 @@ static void fillcmd()
   FreeMemory(rec.data);
 }
 
+
 /**
  * Read two tapes written by the "fill" command and ensure
  *  that the data is valid.  If stop==1 we simulate full read back
@@ -2381,19 +2401,25 @@ static void unfillcmd()
   fd = open(buf, O_RDONLY);
   if (fd >= 0) {
     uint32_t state_level;
-    read(fd, &state_level, sizeof(btape_state_level));
-    read(fd, &simple, sizeof(simple));
-    read(fd, &last_block_num1, sizeof(last_block_num1));
-    read(fd, &last_block_num2, sizeof(last_block_num2));
-    read(fd, &last_file1, sizeof(last_file1));
-    read(fd, &last_file2, sizeof(last_file2));
-    read(fd, last_block1->buf, last_block1->buf_len);
-    read(fd, last_block2->buf, last_block2->buf_len);
-    read(fd, first_block->buf, first_block->buf_len);
-    close(fd);
-    if (state_level != btape_state_level) {
-      Pmsg0(-1, _("\nThe state file level has changed. You must redo\n"
-                  "the fill command.\n"));
+    if (read_or_fail(fd, &state_level, sizeof(btape_state_level))
+        && read_or_fail(fd, &simple, sizeof(simple))
+        && read_or_fail(fd, &last_block_num1, sizeof(last_block_num1))
+        && read_or_fail(fd, &last_block_num2, sizeof(last_block_num2))
+        && read_or_fail(fd, &last_file1, sizeof(last_file1))
+        && read_or_fail(fd, &last_file2, sizeof(last_file2))
+        && read_or_fail(fd, last_block1->buf, last_block1->buf_len)
+        && read_or_fail(fd, last_block2->buf, last_block2->buf_len)
+        && read_or_fail(fd, first_block->buf, first_block->buf_len)
+        && close(fd) == 0) {
+      if (state_level != btape_state_level) {
+        Pmsg0(-1, _("\nThe state file level has changed. You must redo\n"
+                    "the fill command.\n"));
+        exit_code = 1;
+        return;
+      }
+    } else {
+      Pmsg0(-1, _("\nThe state file cannot be read or was corrupted.\n"
+                  "You must redo the fill command.\n"));
       exit_code = 1;
       return;
     }
