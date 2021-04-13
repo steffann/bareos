@@ -70,27 +70,22 @@ static void ConfigureLexErrorHandler(const char* file,
   ConfigureLexErrorHandler(file, line, lc, buf);
 }
 
-static inline bool configure_write_resource(const char* filename,
-                                            const char* resourcetype,
-                                            const char* name,
-                                            const char* content,
-                                            const bool overwrite = false)
+static bool configure_write_resource(const char* filename,
+                                     const char* resourcetype,
+                                     const char* name,
+                                     const char* content,
+                                     const bool overwrite = false)
 {
-  bool result = false;
-  size_t len;
-  int fd;
   int flags = O_CREAT | O_WRONLY | O_TRUNC;
-
   if (!overwrite) { flags |= O_EXCL; }
 
-  if ((fd = open(filename, flags, 0640)) >= 0) {
-    len = strlen(content);
-    write(fd, content, len);
+  const ssize_t len = strlen(content);
+  const int fd = open(filename, flags, 0640);
+  if (fd >= 0 && write(fd, content, len) == len) {
     close(fd);
-    result = true;
+    return true;
   }
-
-  return result;
+  return false;
 }
 
 static inline ResourceItem* config_get_res_item(UaContext* ua,
