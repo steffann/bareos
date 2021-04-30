@@ -109,6 +109,7 @@ static const char *skipped_fs_types[] = {
 #if defined(HAVE_LINUX_OS)
    "rootfs",
 #endif
+   "autofs",
    NULL
 };
 
