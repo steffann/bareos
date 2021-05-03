@@ -1303,7 +1303,7 @@ static void FreeBootstrap(JobControlRecord* jcr)
   }
 }
 
-static pthread_mutex_t bsr_mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex bsr_mutex;
 static uint32_t bsr_uniq = 0;
 
 /**
@@ -1319,11 +1319,11 @@ static bool BootstrapCmd(JobControlRecord* jcr)
   FILE* bs;
 
   FreeBootstrap(jcr);
-  P(bsr_mutex);
+  {std::lock_guard guard(bsr_mutex);
   bsr_uniq++;
   Mmsg(fname, "%s/%s.%s.%d.bootstrap", me->working_directory,
        me->resource_name_, jcr->Job, bsr_uniq);
-  V(bsr_mutex);
+  };
   Dmsg1(400, "bootstrap=%s\n", fname);
   jcr->RestoreBootstrap = fname;
   bs = fopen(fname, "a+b"); /* create file */

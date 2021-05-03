@@ -65,12 +65,12 @@ static char Dir_sorry[] = "2999 Authentication failed.\n";
  */
 static inline void delay()
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  static std::mutex mutex;
 
   // Single thread all failures to avoid DOS
-  P(mutex);
+  {std::lock_guard guard(mutex);
   Bmicrosleep(6, 0);
-  V(mutex);
+  };
 }
 
 static inline void AuthenticateFailed(JobControlRecord* jcr, PoolMem& message)

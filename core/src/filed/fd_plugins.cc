@@ -67,7 +67,7 @@ const char* plugin_type = "-fd.dll";
 const char* plugin_type = "-fd.so";
 #endif
 static alist* fd_plugin_list = NULL;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 extern int SaveFile(JobControlRecord* jcr,
                     FindFilesPacket* ff_pkt,
@@ -2162,7 +2162,7 @@ static bRC bareosGetInstanceCount(PluginContext* ctx, int* ret)
 
   if (!IsCtxGood(ctx, jcr, bctx)) { goto bail_out; }
 
-  P(mutex);
+  {std::lock_guard guard(mutex);
 
   cnt = 0;
   foreach_jcr (njcr) {
@@ -2174,7 +2174,7 @@ static bRC bareosGetInstanceCount(PluginContext* ctx, int* ret)
   }
   endeach_jcr(njcr);
 
-  V(mutex);
+  };
 
   *ret = cnt;
   retval = bRC_OK;
