@@ -56,7 +56,7 @@
 
 static dlist* db_list = NULL;
 
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 BareosDbPostgresql::BareosDbPostgresql(JobControlRecord* jcr,
                                        const char* db_driver,
@@ -185,111 +185,111 @@ bool BareosDbPostgresql::OpenDatabase(JobControlRecord* jcr)
   int errstat;
   char buf[10], *port;
 
-  P(mutex);
-  if (connected_) {
+  {
+    std::lock_guard guard(mutex);
+    if (connected_) {
+      retval = true;
+      return retval;
+    }
+
+    if ((errstat = RwlInit(&lock_)) != 0) {
+      BErrNo be;
+      Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
+            be.bstrerror(errstat));
+      return retval;
+    }
+
+    if (db_port_) {
+      Bsnprintf(buf, sizeof(buf), "%d", db_port_);
+      port = buf;
+    } else {
+      port = NULL;
+    }
+
+    // If connection fails, try at 5 sec intervals for 30 seconds.
+    for (int retry = 0; retry < 6; retry++) {
+      db_handle_ = PQsetdbLogin(db_address_,   /* default = localhost */
+                                port,          /* default port */
+                                NULL,          /* pg options */
+                                NULL,          /* tty, ignored */
+                                db_name_,      /* database name */
+                                db_user_,      /* login name */
+                                db_password_); /* password */
+
+      // If no connect, try once more in case it is a timing problem
+      if (PQstatus(db_handle_) == CONNECTION_OK) { break; }
+
+      Bmicrosleep(5, 0);
+    }
+
+    Dmsg0(50, "pg_real_connect %s\n",
+          PQstatus(db_handle_) == CONNECTION_OK ? "ok" : "failed");
+    Dmsg3(50, "db_user=%s db_name=%s db_password=%s\n", db_user_, db_name_,
+          (db_password_ == NULL) ? "(NULL)" : db_password_);
+
+    if (PQstatus(db_handle_) != CONNECTION_OK) {
+      Mmsg2(errmsg,
+            _("Unable to connect to PostgreSQL server. Database=%s User=%s\n"
+              "Possible causes: SQL server not running; password incorrect; "
+              "max_connections exceeded.\n(%s)\n"),
+            db_name_, db_user_, PQerrorMessage(db_handle_));
+      return retval;
+    }
+
+    connected_ = true;
+    if (!CheckTablesVersion(jcr)) { return retval; }
+
+    SqlQueryWithoutHandler("SET datestyle TO 'ISO, YMD'");
+    SqlQueryWithoutHandler("SET cursor_tuple_fraction=1");
+
+    /*
+     * Tell PostgreSQL we are using standard conforming strings
+     * and avoid warnings such as:
+     *  WARNING:  nonstandard use of \\ in a string literal
+     */
+    SqlQueryWithoutHandler("SET standard_conforming_strings=on");
+
+    // Check that encoding is SQL_ASCII
+    CheckDatabaseEncoding(jcr);
+
     retval = true;
-    goto bail_out;
-  }
-
-  if ((errstat = RwlInit(&lock_)) != 0) {
-    BErrNo be;
-    Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
-          be.bstrerror(errstat));
-    goto bail_out;
-  }
-
-  if (db_port_) {
-    Bsnprintf(buf, sizeof(buf), "%d", db_port_);
-    port = buf;
-  } else {
-    port = NULL;
-  }
-
-  // If connection fails, try at 5 sec intervals for 30 seconds.
-  for (int retry = 0; retry < 6; retry++) {
-    db_handle_ = PQsetdbLogin(db_address_,   /* default = localhost */
-                              port,          /* default port */
-                              NULL,          /* pg options */
-                              NULL,          /* tty, ignored */
-                              db_name_,      /* database name */
-                              db_user_,      /* login name */
-                              db_password_); /* password */
-
-    // If no connect, try once more in case it is a timing problem
-    if (PQstatus(db_handle_) == CONNECTION_OK) { break; }
-
-    Bmicrosleep(5, 0);
-  }
-
-  Dmsg0(50, "pg_real_connect %s\n",
-        PQstatus(db_handle_) == CONNECTION_OK ? "ok" : "failed");
-  Dmsg3(50, "db_user=%s db_name=%s db_password=%s\n", db_user_, db_name_,
-        (db_password_ == NULL) ? "(NULL)" : db_password_);
-
-  if (PQstatus(db_handle_) != CONNECTION_OK) {
-    Mmsg2(errmsg,
-          _("Unable to connect to PostgreSQL server. Database=%s User=%s\n"
-            "Possible causes: SQL server not running; password incorrect; "
-            "max_connections exceeded.\n(%s)\n"),
-          db_name_, db_user_, PQerrorMessage(db_handle_));
-    goto bail_out;
-  }
-
-  connected_ = true;
-  if (!CheckTablesVersion(jcr)) { goto bail_out; }
-
-  SqlQueryWithoutHandler("SET datestyle TO 'ISO, YMD'");
-  SqlQueryWithoutHandler("SET cursor_tuple_fraction=1");
-
-  /*
-   * Tell PostgreSQL we are using standard conforming strings
-   * and avoid warnings such as:
-   *  WARNING:  nonstandard use of \\ in a string literal
-   */
-  SqlQueryWithoutHandler("SET standard_conforming_strings=on");
-
-  // Check that encoding is SQL_ASCII
-  CheckDatabaseEncoding(jcr);
-
-  retval = true;
-
-bail_out:
-  V(mutex);
+  };
   return retval;
 }
 
 void BareosDbPostgresql::CloseDatabase(JobControlRecord* jcr)
 {
   if (connected_) { EndTransaction(jcr); }
-  P(mutex);
-  ref_count_--;
-  if (ref_count_ == 0) {
-    if (connected_) { SqlFreeResult(); }
-    db_list->remove(this);
-    if (connected_ && db_handle_) { PQfinish(db_handle_); }
-    if (RwlIsInit(&lock_)) { RwlDestroy(&lock_); }
-    FreePoolMemory(errmsg);
-    FreePoolMemory(cmd);
-    FreePoolMemory(cached_path);
-    FreePoolMemory(fname);
-    FreePoolMemory(path);
-    FreePoolMemory(esc_name);
-    FreePoolMemory(esc_path);
-    FreePoolMemory(esc_obj);
-    FreePoolMemory(buf_);
-    if (db_driver_) { free(db_driver_); }
-    if (db_name_) { free(db_name_); }
-    if (db_user_) { free(db_user_); }
-    if (db_password_) { free(db_password_); }
-    if (db_address_) { free(db_address_); }
-    if (db_socket_) { free(db_socket_); }
-    delete this;
-    if (db_list->size() == 0) {
-      delete db_list;
-      db_list = NULL;
+  {
+    std::lock_guard guard(mutex);
+    ref_count_--;
+    if (ref_count_ == 0) {
+      if (connected_) { SqlFreeResult(); }
+      db_list->remove(this);
+      if (connected_ && db_handle_) { PQfinish(db_handle_); }
+      if (RwlIsInit(&lock_)) { RwlDestroy(&lock_); }
+      FreePoolMemory(errmsg);
+      FreePoolMemory(cmd);
+      FreePoolMemory(cached_path);
+      FreePoolMemory(fname);
+      FreePoolMemory(path);
+      FreePoolMemory(esc_name);
+      FreePoolMemory(esc_path);
+      FreePoolMemory(esc_obj);
+      FreePoolMemory(buf_);
+      if (db_driver_) { free(db_driver_); }
+      if (db_name_) { free(db_name_); }
+      if (db_user_) { free(db_user_); }
+      if (db_password_) { free(db_password_); }
+      if (db_address_) { free(db_address_); }
+      if (db_socket_) { free(db_socket_); }
+      delete this;
+      if (db_list->size() == 0) {
+        delete db_list;
+        db_list = NULL;
+      }
     }
-  }
-  V(mutex);
+  };
 }
 
 bool BareosDbPostgresql::ValidateConnection(void)
@@ -633,9 +633,7 @@ retry_query:
       break;
     case PGRES_FATAL_ERROR:
       Dmsg1(50, "Result status fatal: %s\n", query);
-      if (exit_on_fatal_) {
-        Emsg0(M_ERROR_TERM, 0, "Fatal database error\n");
-      }
+      if (exit_on_fatal_) { Emsg0(M_ERROR_TERM, 0, "Fatal database error\n"); }
 
       if (try_reconnect_ && !transaction_) {
         /*
@@ -952,28 +950,27 @@ BareosDb* db_init_database(JobControlRecord* jcr,
     Jmsg(jcr, M_FATAL, 0, _("A user name for PostgreSQL must be supplied.\n"));
     return NULL;
   }
-  P(mutex); /* lock DB queue */
+  {
+    std::lock_guard guard(mutex); /* lock DB queue */
 
-  // Look to see if DB already open
-  if (db_list && !mult_db_connections && !need_private) {
-    foreach_dlist (mdb, db_list) {
-      if (mdb->IsPrivate()) { continue; }
+    // Look to see if DB already open
+    if (db_list && !mult_db_connections && !need_private) {
+      foreach_dlist (mdb, db_list) {
+        if (mdb->IsPrivate()) { continue; }
 
-      if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
-        Dmsg1(100, "DB REopen %s\n", db_name);
-        mdb->IncrementRefcount();
-        goto bail_out;
+        if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
+          Dmsg1(100, "DB REopen %s\n", db_name);
+          mdb->IncrementRefcount();
+          return mdb;
+        }
       }
     }
-  }
-  Dmsg0(100, "db_init_database first time\n");
-  mdb = new BareosDbPostgresql(jcr, db_driver, db_name, db_user, db_password,
-                               db_address, db_port, db_socket,
-                               mult_db_connections, disable_batch_insert,
-                               try_reconnect, exit_on_fatal, need_private);
-
-bail_out:
-  V(mutex);
+    Dmsg0(100, "db_init_database first time\n");
+    mdb = new BareosDbPostgresql(jcr, db_driver, db_name, db_user, db_password,
+                                 db_address, db_port, db_socket,
+                                 mult_db_connections, disable_batch_insert,
+                                 try_reconnect, exit_on_fatal, need_private);
+  };
   return mdb;
 }
 
