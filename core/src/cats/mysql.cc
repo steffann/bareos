@@ -55,7 +55,7 @@
 // List of open databases
 static dlist* db_list = NULL;
 
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 BareosDbMysql::BareosDbMysql(JobControlRecord* jcr,
                              const char* db_driver,
