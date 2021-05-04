@@ -3,7 +3,7 @@
 
    Copyright (C) 2000-2011 Free Software Foundation Europe e.V.
    Copyright (C) 2011-2012 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -50,7 +50,7 @@
 #endif
 
 #ifndef HAVE_GETADDRINFO
-static pthread_mutex_t ip_mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex ip_mutex;
 #endif
 
 /**
@@ -345,17 +345,20 @@ static const char* resolv_host(int family, const char* host, dlist* addr_list)
   char** p;
   IPADDR* addr;
 
-  P(ip_mutex); /* gethostbyname() is not thread safe */
+  {
+    std::lock_guard guard(ip_mutex); /* gethostbyname() is not thread safe */
 #  ifdef HAVE_GETHOSTBYNAME2
-  if ((hp = gethostbyname2(host, family)) == NULL) {
+    if ((hp = gethostbyname2(host, family)) == NULL) {
 #  else
-  if ((hp = gethostbyname(host)) == NULL) {
+    if ((hp = gethostbyname(host)) == NULL) {
 #  endif
-    /* may be the strerror give not the right result -:( */
-    errmsg = gethost_strerror();
-    V(ip_mutex);
+      /* may be the strerror give not the right result -:( */
+      errmsg = gethost_strerror();
+    }
     return errmsg;
-  } else {
+  }
+  else
+  {
     for (p = hp->h_addr_list; *p != 0; p++) {
       switch (hp->h_addrtype) {
         case AF_INET:
@@ -375,9 +378,9 @@ static const char* resolv_host(int family, const char* host, dlist* addr_list)
       }
       addr_list->append(addr);
     }
-    V(ip_mutex);
   }
-  return NULL;
+}
+return NULL;
 }
 #endif
 
