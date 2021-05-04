@@ -3,7 +3,7 @@
 
    Copyright (C) 2000-2012 Free Software Foundation Europe e.V.
    Copyright (C) 2011-2012 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -45,7 +45,7 @@
 namespace storagedaemon {
 
 static const int debuglevel = 50;
-static pthread_mutex_t vol_info_mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex vol_info_mutex;
 
 /* Requests sent to the Director */
 static char Find_media[]
@@ -169,15 +169,16 @@ bool StorageDaemonDeviceControlRecord::DirGetVolumeInfo(
   bool ok;
   BareosSocket* dir = jcr->dir_bsock;
 
-  P(vol_info_mutex);
-  setVolCatName(VolumeName);
-  BashSpaces(getVolCatName());
-  dir->fsend(Get_Vol_Info, jcr->Job, getVolCatName(),
-             (writing == GET_VOL_INFO_FOR_WRITE) ? 1 : 0);
-  Dmsg1(debuglevel, ">dird %s", dir->msg);
-  UnbashSpaces(getVolCatName());
-  ok = DoGetVolumeInfo(this);
-  V(vol_info_mutex);
+  {
+    std::lock_guard guard(vol_info_mutex);
+    setVolCatName(VolumeName);
+    BashSpaces(getVolCatName());
+    dir->fsend(Get_Vol_Info, jcr->Job, getVolCatName(),
+               (writing == GET_VOL_INFO_FOR_WRITE) ? 1 : 0);
+    Dmsg1(debuglevel, ">dird %s", dir->msg);
+    UnbashSpaces(getVolCatName());
+    ok = DoGetVolumeInfo(this);
+  };
 
   return ok;
 }
@@ -208,57 +209,57 @@ bool StorageDaemonDeviceControlRecord::DirFindNextAppendableVolume()
    * drive, so we continue looking for a not in use Volume.
    */
   LockVolumes();
-  P(vol_info_mutex);
-  ClearFoundInUse();
+  {
+    std::lock_guard guard(vol_info_mutex);
+    ClearFoundInUse();
 
-  PmStrcpy(unwanted_volumes, "");
-  for (int vol_index = 1; vol_index < 20; vol_index++) {
-    BashSpaces(media_type);
-    BashSpaces(pool_name);
-    BashSpaces(unwanted_volumes.c_str());
-    dir->fsend(Find_media, jcr->Job, vol_index, pool_name, media_type,
-               unwanted_volumes.c_str());
-    UnbashSpaces(media_type);
-    UnbashSpaces(pool_name);
-    UnbashSpaces(unwanted_volumes.c_str());
-    Dmsg1(debuglevel, ">dird %s", dir->msg);
+    PmStrcpy(unwanted_volumes, "");
+    for (int vol_index = 1; vol_index < 20; vol_index++) {
+      BashSpaces(media_type);
+      BashSpaces(pool_name);
+      BashSpaces(unwanted_volumes.c_str());
+      dir->fsend(Find_media, jcr->Job, vol_index, pool_name, media_type,
+                 unwanted_volumes.c_str());
+      UnbashSpaces(media_type);
+      UnbashSpaces(pool_name);
+      UnbashSpaces(unwanted_volumes.c_str());
+      Dmsg1(debuglevel, ">dird %s", dir->msg);
 
-    if (DoGetVolumeInfo(this)) {
-      if (vol_index == 1) {
-        PmStrcpy(unwanted_volumes, VolumeName);
-      } else {
-        PmStrcat(unwanted_volumes, ",");
-        PmStrcat(unwanted_volumes, VolumeName);
-      }
+      if (DoGetVolumeInfo(this)) {
+        if (vol_index == 1) {
+          PmStrcpy(unwanted_volumes, VolumeName);
+        } else {
+          PmStrcat(unwanted_volumes, ",");
+          PmStrcat(unwanted_volumes, VolumeName);
+        }
 
-      if (Can_i_write_volume()) {
-        Dmsg1(debuglevel, "Call reserve_volume for write. Vol=%s\n",
-              VolumeName);
-        if (reserve_volume(this, VolumeName) == NULL) {
-          Dmsg2(debuglevel, "Could not reserve volume %s on %s\n", VolumeName,
-                dev->print_name());
+        if (Can_i_write_volume()) {
+          Dmsg1(debuglevel, "Call reserve_volume for write. Vol=%s\n",
+                VolumeName);
+          if (reserve_volume(this, VolumeName) == NULL) {
+            Dmsg2(debuglevel, "Could not reserve volume %s on %s\n", VolumeName,
+                  dev->print_name());
+            continue;
+          }
+          Dmsg1(debuglevel, "DirFindNextAppendableVolume return true. vol=%s\n",
+                VolumeName);
+          retval = true;
+          goto get_out;
+        } else {
+          Dmsg1(debuglevel, "Volume %s is in use.\n", VolumeName);
+
+          // If volume is not usable, it is in use by someone else
+          SetFoundInUse();
           continue;
         }
-        Dmsg1(debuglevel, "DirFindNextAppendableVolume return true. vol=%s\n",
-              VolumeName);
-        retval = true;
-        goto get_out;
-      } else {
-        Dmsg1(debuglevel, "Volume %s is in use.\n", VolumeName);
-
-        // If volume is not usable, it is in use by someone else
-        SetFoundInUse();
-        continue;
       }
+      Dmsg2(debuglevel, "No vol. index %d return false. dev=%s\n", vol_index,
+            dev->print_name());
+      break;
     }
-    Dmsg2(debuglevel, "No vol. index %d return false. dev=%s\n", vol_index,
-          dev->print_name());
-    break;
-  }
-  VolumeName[0] = 0;
-
+    VolumeName[0] = 0;
+  };
 get_out:
-  V(vol_info_mutex);
   UnlockVolumes();
 
   return retval;
@@ -290,47 +291,46 @@ bool StorageDaemonDeviceControlRecord::DirUpdateVolumeInfo(
   }
 
   // Lock during Volume update
-  P(vol_info_mutex);
-  Dmsg1(debuglevel, "Update cat VolBytes=%lld\n", vol->VolCatBytes);
+  {
+    std::lock_guard guard(vol_info_mutex);
+    Dmsg1(debuglevel, "Update cat VolBytes=%lld\n", vol->VolCatBytes);
 
-  // Just labeled or relabeled the tape
-  if (label) {
-    bstrncpy(vol->VolCatStatus, "Append", sizeof(vol->VolCatStatus));
-  }
-  // if (update_LastWritten) {
-  vol->VolLastWritten = time(NULL);
-  // }
-  PmStrcpy(volume_name, vol->VolCatName);
-  BashSpaces(volume_name);
-  InChanger = vol->InChanger;
-  dir->fsend(
-      Update_media, jcr->Job, volume_name.c_str(), vol->VolCatJobs,
-      vol->VolCatFiles, vol->VolCatBlocks, edit_uint64(vol->VolCatBytes, ed1),
-      vol->VolCatMounts, vol->VolCatErrors, vol->VolCatWrites,
-      edit_uint64(vol->VolCatMaxBytes, ed2),
-      edit_uint64(vol->VolLastWritten, ed6), vol->VolCatStatus, vol->Slot,
-      label, InChanger, /* bool in structure */
-      edit_int64(vol->VolReadTime, ed3), edit_int64(vol->VolWriteTime, ed4),
-      edit_uint64(vol->VolFirstWritten, ed5));
-  Dmsg1(debuglevel, ">dird %s", dir->msg);
-
-  // Do not lock device here because it may be locked from label
-  if (!jcr->IsCanceled()) {
-    if (!DoGetVolumeInfo(this)) {
-      Jmsg(jcr, M_FATAL, 0, "%s", jcr->errmsg);
-      Dmsg2(debuglevel, _("Didn't get vol info vol=%s: ERR=%s"),
-            vol->VolCatName, jcr->errmsg);
-      goto bail_out;
+    // Just labeled or relabeled the tape
+    if (label) {
+      bstrncpy(vol->VolCatStatus, "Append", sizeof(vol->VolCatStatus));
     }
-    Dmsg1(420, "get_volume_info() %s", dir->msg);
+    // if (update_LastWritten) {
+    vol->VolLastWritten = time(NULL);
+    // }
+    PmStrcpy(volume_name, vol->VolCatName);
+    BashSpaces(volume_name);
+    InChanger = vol->InChanger;
+    dir->fsend(
+        Update_media, jcr->Job, volume_name.c_str(), vol->VolCatJobs,
+        vol->VolCatFiles, vol->VolCatBlocks, edit_uint64(vol->VolCatBytes, ed1),
+        vol->VolCatMounts, vol->VolCatErrors, vol->VolCatWrites,
+        edit_uint64(vol->VolCatMaxBytes, ed2),
+        edit_uint64(vol->VolLastWritten, ed6), vol->VolCatStatus, vol->Slot,
+        label, InChanger, /* bool in structure */
+        edit_int64(vol->VolReadTime, ed3), edit_int64(vol->VolWriteTime, ed4),
+        edit_uint64(vol->VolFirstWritten, ed5));
+    Dmsg1(debuglevel, ">dird %s", dir->msg);
 
-    // Update dev Volume info in case something changed (e.g. expired)
-    dev->VolCatInfo = VolCatInfo;
-    ok = true;
+    // Do not lock device here because it may be locked from label
+    if (!jcr->IsCanceled()) {
+      if (!DoGetVolumeInfo(this)) {
+        Jmsg(jcr, M_FATAL, 0, "%s", jcr->errmsg);
+        Dmsg2(debuglevel, _("Didn't get vol info vol=%s: ERR=%s"),
+              vol->VolCatName, jcr->errmsg);
+        return ok;
+      }
+      Dmsg1(420, "get_volume_info() %s", dir->msg);
+
+      // Update dev Volume info in case something changed (e.g. expired)
+      dev->VolCatInfo = VolCatInfo;
+      ok = true;
+    }
   }
-
-bail_out:
-  V(vol_info_mutex);
   return ok;
 }
 
