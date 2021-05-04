@@ -3,7 +3,7 @@
 
    Copyright (C) 2007-2011 Free Software Foundation Europe e.V.
    Copyright (C) 2011-2016 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -41,7 +41,7 @@ const char* plugin_type = "-dir.so";
 #endif
 
 static alist* dird_plugin_list;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 /* Forward referenced functions */
 static bRC bareosGetValue(PluginContext* ctx, brDirVariable var, void* value);
@@ -794,19 +794,19 @@ static bRC bareosGetInstanceCount(PluginContext* ctx, int* ret)
 
   if (!IsCtxGood(ctx, jcr, bctx)) { goto bail_out; }
 
-  P(mutex);
+  {
+    std::lock_guard guard(mutex);
 
-  cnt = 0;
-  foreach_jcr (njcr) {
-    if (jcr->plugin_ctx_list) {
-      foreach_alist (nctx, jcr->plugin_ctx_list) {
-        if (nctx->plugin == bctx->plugin) { cnt++; }
+    cnt = 0;
+    foreach_jcr (njcr) {
+      if (jcr->plugin_ctx_list) {
+        foreach_alist (nctx, jcr->plugin_ctx_list) {
+          if (nctx->plugin == bctx->plugin) { cnt++; }
+        }
       }
     }
-  }
-  endeach_jcr(njcr);
-
-  V(mutex);
+    endeach_jcr(njcr);
+  };
 
   *ret = cnt;
   retval = bRC_OK;
