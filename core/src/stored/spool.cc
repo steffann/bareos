@@ -66,7 +66,7 @@ struct spool_stats_t {
   int64_t attr_size;
 };
 
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 static spool_stats_t spool_stats;
 
 /**
@@ -127,9 +127,10 @@ bool BeginDataSpool(DeviceControlRecord* dcr)
     if (status) {
       dcr->spooling = true;
       Jmsg(dcr->jcr, M_INFO, 0, _("Spooling data ...\n"));
-      P(mutex);
-      spool_stats.data_jobs++;
-      V(mutex);
+      {
+        std::lock_guard guard(mutex);
+        spool_stats.data_jobs++;
+      };
     }
   }
 
@@ -216,15 +217,16 @@ static bool CloseDataSpoolFile(DeviceControlRecord* dcr, bool end_of_spool)
   Dmsg1(100, "Deleted spool file: %s\n", name);
   FreePoolMemory(name);
 
-  P(mutex);
-  spool_stats.data_jobs--;
-  if (end_of_spool) { spool_stats.total_data_jobs++; }
-  if (spool_stats.data_size < dcr->job_spool_size) {
-    spool_stats.data_size = 0;
-  } else {
-    spool_stats.data_size -= dcr->job_spool_size;
-  }
-  V(mutex);
+  {
+    std::lock_guard guard(mutex);
+    spool_stats.data_jobs--;
+    if (end_of_spool) { spool_stats.total_data_jobs++; }
+    if (spool_stats.data_size < dcr->job_spool_size) {
+      spool_stats.data_size = 0;
+    } else {
+      spool_stats.data_size -= dcr->job_spool_size;
+    }
+  };
 
   P(dcr->dev->spool_mutex);
   dcr->dev->spool_size -= dcr->job_spool_size;
@@ -394,13 +396,14 @@ static bool DespoolData(DeviceControlRecord* dcr, bool commit)
       // Note, try continuing despite ftruncate problem
     }
 
-    P(mutex);
-    if (spool_stats.data_size < dcr->job_spool_size) {
-      spool_stats.data_size = 0;
-    } else {
-      spool_stats.data_size -= dcr->job_spool_size;
-    }
-    V(mutex);
+    {
+      std::lock_guard guard(mutex);
+      if (spool_stats.data_size < dcr->job_spool_size) {
+        spool_stats.data_size = 0;
+      } else {
+        spool_stats.data_size -= dcr->job_spool_size;
+      }
+    };
     P(dcr->dev->spool_mutex);
     dcr->dev->spool_size -= dcr->job_spool_size;
     dcr->job_spool_size = 0; /* zap size in input dcr */
@@ -522,12 +525,13 @@ bool WriteBlockToSpoolFile(DeviceControlRecord* dcr)
     despool = true;
   }
   V(dcr->dev->spool_mutex);
-  P(mutex);
-  spool_stats.data_size += hlen + wlen;
-  if (spool_stats.data_size > spool_stats.max_data_size) {
-    spool_stats.max_data_size = spool_stats.data_size;
-  }
-  V(mutex);
+  {
+    std::lock_guard guard(mutex);
+    spool_stats.data_size += hlen + wlen;
+    if (spool_stats.data_size > spool_stats.max_data_size) {
+      spool_stats.max_data_size = spool_stats.data_size;
+    }
+  };
   if (despool) {
     char ec1[30], ec2[30];
     if (dcr->max_job_spool_size > 0) {
@@ -704,15 +708,16 @@ bool DiscardAttributeSpool(JobControlRecord* jcr)
 
 static void UpdateAttrSpoolSize(ssize_t size)
 {
-  P(mutex);
-  if (size > 0) {
-    if ((spool_stats.attr_size - size) > 0) {
-      spool_stats.attr_size -= size;
-    } else {
-      spool_stats.attr_size = 0;
+  {
+    std::lock_guard guard(mutex);
+    if (size > 0) {
+      if ((spool_stats.attr_size - size) > 0) {
+        spool_stats.attr_size -= size;
+      } else {
+        spool_stats.attr_size = 0;
+      }
     }
-  }
-  V(mutex);
+  };
 }
 
 static void MakeUniqueSpoolFilename(JobControlRecord* jcr,
@@ -799,12 +804,13 @@ bool CommitAttributeSpool(JobControlRecord* jcr)
       goto bail_out;
     }
 
-    P(mutex);
-    if (spool_stats.attr_size + size > spool_stats.max_attr_size) {
-      spool_stats.max_attr_size = spool_stats.attr_size + size;
-    }
-    spool_stats.attr_size += size;
-    V(mutex);
+    {
+      std::lock_guard guard(mutex);
+      if (spool_stats.attr_size + size > spool_stats.max_attr_size) {
+        spool_stats.max_attr_size = spool_stats.attr_size + size;
+      }
+      spool_stats.attr_size += size;
+    };
 
     jcr->sendJobStatus(JS_AttrDespooling);
     Jmsg(jcr, M_INFO, 0,
@@ -842,9 +848,10 @@ static bool OpenAttrSpoolFile(JobControlRecord* jcr, BareosSocket* bs)
     return false;
   }
 
-  P(mutex);
-  spool_stats.attr_jobs++;
-  V(mutex);
+  {
+    std::lock_guard guard(mutex);
+    spool_stats.attr_jobs++;
+  };
 
   FreePoolMemory(name);
 
@@ -862,10 +869,11 @@ static bool CloseAttrSpoolFile(JobControlRecord* jcr, BareosSocket* bs)
 
   name = GetPoolMemory(PM_MESSAGE);
 
-  P(mutex);
-  spool_stats.attr_jobs--;
-  spool_stats.total_attr_jobs++;
-  V(mutex);
+  {
+    std::lock_guard guard(mutex);
+    spool_stats.attr_jobs--;
+    spool_stats.total_attr_jobs++;
+  };
 
   MakeUniqueSpoolFilename(jcr, name, bs->fd_);
 
