@@ -25,56 +25,67 @@
 #  include "include/bareos.h"
 #endif
 
+
+#include <string>
 #include "Python.h"
 #include "plugins/include/python3compat.h"
 class PoolMem;
-#define NbytesForBits(n) ((((n)-1) >> 3) + 1)
-typedef off_t boffset_t;
-
+#include "filed/filed.h"
 #include "lib/plugins.h"
 #include "filed/fd_plugins.h"
 #include "../module/bareosfd.h"
-static void PyErrorHandler()
-{
-  PyObject *type, *value, *traceback;
-  PyObject* tracebackModule;
-  char* error_string;
 
-  PyErr_Fetch(&type, &value, &traceback);
-  PyErr_NormalizeException(&type, &value, &traceback);
+#include "../python-fd.h"
 
-  tracebackModule = PyImport_ImportModule("traceback");
-  if (tracebackModule != NULL) {
-    PyObject *tbList, *emptyString, *strRetval;
-
-    tbList = PyObject_CallMethod(tracebackModule, (char*)"format_exception",
-                                 (char*)"OOO", type,
-                                 value == NULL ? Py_None : value,
-                                 traceback == NULL ? Py_None : traceback);
-
-    emptyString = PyUnicode_FromString("");
-    strRetval
-        = PyObject_CallMethod(emptyString, (char*)"join", (char*)"O", tbList);
-
-    error_string = strdup(PyUnicode_AsUTF8(strRetval));
-
-    Py_DECREF(tbList);
-    Py_DECREF(emptyString);
-    Py_DECREF(strRetval);
-    Py_DECREF(tracebackModule);
-  } else {
-    error_string = strdup("Unable to import traceback module.");
-  }
-  Py_DECREF(type);
-  Py_XDECREF(value);
-  Py_XDECREF(traceback);
-  printf("%s", error_string);
-
-  free(error_string);
-  exit(1);
-}
+#define NbytesForBits(n) ((((n)-1) >> 3) + 1)
 
 using namespace filedaemon;
+
+// fd_plugins.cc
+// Bareos private context
+struct b_plugin_ctx {
+  JobControlRecord* jcr; /* jcr for plugin */
+  bRC ret;               /* last return code */
+  bool disabled;         /* set if plugin disabled */
+  bool restoreFileStarted;
+  bool createFileCalled;
+  char events[NbytesForBits(FD_NR_EVENTS + 1)]; /* enabled events bitmask */
+  findIncludeExcludeItem* exclude;              /* pointer to exclude files */
+  findIncludeExcludeItem* include; /* pointer to include/exclude files */
+  Plugin* plugin; /* pointer to plugin of which this is an instance off */
+};
+
+
+// fd_plugins.cc
+// Instantiate a new plugin instance.
+static inline PluginContext* instantiate_plugin(JobControlRecord* jcr,
+                                                Plugin* plugin,
+                                                char instance)
+{
+  PluginContext* ctx;
+  b_plugin_ctx* b_ctx;
+
+  b_ctx = (b_plugin_ctx*)malloc(sizeof(b_plugin_ctx));
+  b_ctx = (b_plugin_ctx*)memset(b_ctx, 0, sizeof(b_plugin_ctx));
+  b_ctx->jcr = jcr;
+  b_ctx->plugin = plugin;
+
+  ctx = (PluginContext*)malloc(sizeof(PluginContext));
+  ctx->instance = instance;
+  ctx->plugin = plugin;
+  ctx->core_private_context = (void*)b_ctx;
+  ctx->plugin_private_context = NULL;
+
+  if (jcr) { jcr->plugin_ctx_list->append(ctx); }
+
+  if (PlugFunc(plugin)->newPlugin(ctx) != bRC_OK) {
+    b_ctx->disabled = true;
+    printf("plugin disabled\n");
+  }
+
+  return ctx;
+}
+
 bRC bareosRegisterEvents(PluginContext* ctx, int nr_events, ...)
 {
   return bRC_OK;
@@ -100,10 +111,17 @@ bRC bareosJobMsg(PluginContext* ctx,
                  const char* fmt,
                  ...)
 {
-  printf("bareosJobMsg file:%s line:%d type:%d time: %ld, fmt:%s\n", file, line,
-         type, (int64_t)mtime, fmt);
+  va_list arg_ptr;
+
+  printf("job(%d) %ld ", type, (int64_t)mtime);
+  va_start(arg_ptr, fmt);
+  vprintf(fmt, arg_ptr);
+  va_end(arg_ptr);
+  printf(" [%s:%d]\n", file, line);
+
   return bRC_OK;
 };
+
 bRC bareosDebugMsg(PluginContext* ctx,
                    const char* file,
                    int line,
@@ -111,10 +129,17 @@ bRC bareosDebugMsg(PluginContext* ctx,
                    const char* fmt,
                    ...)
 {
-  printf("bareosDebugMsg file:%s line:%d level:%d fmt:%s\n", file, line, level,
-         fmt);
+  va_list arg_ptr;
+
+  printf("debug(%d) ", level);
+  va_start(arg_ptr, fmt);
+  vprintf(fmt, arg_ptr);
+  va_end(arg_ptr);
+  printf(" [%s:%d]\n", file, line);
+
   return bRC_OK;
-};
+}
+
 void* bareosMalloc(PluginContext* ctx, const char* file, int line, size_t size)
 {
   return NULL;
@@ -154,7 +179,8 @@ bRC bareosClearSeenBitmap(PluginContext* ctx, bool all, char* fname)
   return bRC_OK;
 };
 
-
+// fd_plugins.cc
+/* Pointers to Bareos functions */
 /* Bareos entry points */
 static filedaemon::CoreFunctions bareos_core_functions
     = {sizeof(filedaemon::CoreFunctions),
@@ -182,54 +208,74 @@ static filedaemon::CoreFunctions bareos_core_functions
        bareosClearSeenBitmap};
 
 
-// create plugin context
-
-Plugin plugin = {(char*)"python-fd-module-teste", 123, NULL, NULL, NULL};
-
-static PluginContext bareos_PluginContext = {0, &plugin, NULL, NULL};
-
 int main(int argc, char* argv[])
 {
-  /* Py_SetProgramName(argv[0]); */
-  Py_Initialize();
+  // disable buffering stdout
+  setbuf(stdout, NULL);
 
-  PyObject* bareosfdModule = PyImport_ImportModule("bareosfd");
-  if (bareosfdModule) {
-    printf("loaded bareosfd successfully\n");
-  } else {
-    printf("loading of bareosfd extension module failed\n");
+  int rc = 1;
+
+  std::string plugin_definition(
+      "python"
+      ":module_name=bareosfd-module-test"
+      ":key1=value1:key2=value2...");
+  if (argc > 1) { plugin_definition.assign(argv[1]); }
+
+  PluginInformation* plugin_information = nullptr;
+  PluginFunctions* plugin_functions = nullptr;
+  PluginContext* ctx = nullptr;
+  PoolMem plugin_options;
+
+  // fd_plugins.cc
+  /* Bareos info */
+  static PluginApiDefinition lbareos_plugin_interface_version
+      = {sizeof(PluginApiDefinition), FD_PLUGIN_INTERFACE_VERSION};
+
+  if (loadPlugin(
+          &lbareos_plugin_interface_version, &bareos_core_functions,
+          &plugin_information,  // PluginInformation** plugin_information,
+          &plugin_functions     // PluginFunctions** plugin_functions
+          )
+      != bRC_OK) {
+    printf("loadPlugin failed\n");
+    goto bail_out;
   }
-  if (PyErr_Occurred()) { PyErrorHandler(); }
 
-  import_bareosfd();
-  Bareosfd_set_bareos_core_functions(&bareos_core_functions);
-  Bareosfd_set_plugin_context(&bareos_PluginContext);
+  static Plugin plugin = {(char*)"python-fd-module-tester",  // filename
+                          0,                                 // file_len
+                          NULL,                              // unload
+                          plugin_information,
+                          plugin_functions,
+                          NULL};  // plugin_handle
 
-  PyObject* pModule = PyImport_ImportModule("bareosfd-module-test");
+  ctx = instantiate_plugin(nullptr, &plugin, 0);
 
-  if (PyErr_Occurred()) { PyErrorHandler(); }
-  PyObject* pDict = PyModule_GetDict(pModule);
-  PyObject* pFunc = PyDict_GetItemString(pDict, "load_bareos_plugin");
-
-  if (pFunc && PyCallable_Check(pFunc)) {
-    printf("load_bareos_plugin found and is callable\n");
-    PyObject *pPluginDefinition, *pRetVal;
-
-
-    pPluginDefinition = PyUnicode_FromString((char*)"PluginDefinition");
-
-    pRetVal = PyObject_CallFunctionObjArgs(pFunc, pPluginDefinition, NULL);
-
-    Py_DECREF(pPluginDefinition);
-    if (pRetVal) { Py_DECREF(pRetVal); }
-    if (PyErr_Occurred()) { PyErrorHandler(); }
-  } else {
-    printf("load_bareos_plugin() not found in module");
+  if (parse_plugin_definition(ctx, plugin_definition.c_str(), plugin_options)
+      != bRC_OK) {
+    printf("parse_plugin_definition failed\n");
+    goto bail_out;
   }
-  Py_DECREF(pDict);
-  Py_DECREF(pFunc);
+  printf("plugin_options: %s\n", plugin_options.c_str());
 
-  Py_DECREF(pModule);
-  Py_Finalize();
-  return 0;
+  PyRestoreThread();
+  if (PyLoadModule(ctx, plugin_options.c_str()) != bRC_OK) {
+    printf("PyLoadModule failed\n");
+    goto bail_out;
+  }
+  printf("PyLoadModule loaded\n");
+
+  /*
+  if (Bareosfd_PyParsePluginDefinition(ctx, plugin_options.c_str()) != bRC_OK) {
+    printf("Bareosfd_PyParsePluginDefinition failed\n");
+    goto bail_out;
+  }
+  */
+
+  // plugin.unloadPlugin();
+  // PySaveThread();
+  // Py_Finalize();
+  rc = 0;
+
+bail_out:
+  return rc;
 }

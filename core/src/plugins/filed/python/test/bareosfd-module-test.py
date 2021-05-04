@@ -1,6 +1,6 @@
 #   BAREOS - Backup Archiving REcovery Open Sourced
 #
-#   Copyright (C) 2020-2020 Bareos GmbH & Co. KG
+#   Copyright (C) 2020-2021 Bareos GmbH & Co. KG
 #
 #   This program is Free Software; you can redistribute it and/or
 #   modify it under the terms of version three of the GNU Affero General Public
@@ -26,3 +26,10 @@ def load_bareos_plugin(plugindef):
     print(bareosfd)
     bareosfd.DebugMessage(100, "Kuckuck")
     bareosfd.JobMessage(100, "Kuckuck")
+
+    return bareosfd.bRC_OK
+
+
+def parse_plugin_definition(plugindef):
+    bareosfd.DebugMessage(100, "parse_plugin_definition()")
+    return bareosfd.bRC_OK

@@ -119,6 +119,8 @@ static bRC set_plugin_context(PluginContext* new_plugin_context)
  */
 static bRC PyParsePluginDefinition(PluginContext* plugin_ctx, void* value)
 {
+  Dmsg(plugin_ctx, debuglevel, LOGPREFIX "PyParsePluginDefinition() start\n");
+
   bRC retval = bRC_Error;
   struct plugin_private_context* plugin_priv_ctx
       = (struct plugin_private_context*)plugin_ctx->plugin_private_context;

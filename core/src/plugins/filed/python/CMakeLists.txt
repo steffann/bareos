@@ -35,6 +35,19 @@ if(Python2_FOUND)
   add_dependencies(python-fd bareosfd-python2-module)
 endif()
 
+if(Python2_FOUND)
+  add_library(python2-fd-lib STATIC python-fd.cc)
+  target_link_libraries(python2-fd-lib ${Python2_LIBRARIES} bareos)
+  target_include_directories(
+    python2-fd-lib PUBLIC SYSTEM ${Python2_INCLUDE_DIRS}
+  )
+  target_compile_definitions(
+    python2-fd-lib PUBLIC PY2MODDIR=\"${Python2_SITELIB}\"
+  )
+  add_dependencies(bareos-fd python2-fd-lib)
+  add_dependencies(python2-fd-lib bareosfd-python2-module)
+endif()
+
 if(Python3_FOUND)
   add_library(python3-fd MODULE python-fd.cc)
   set_target_properties(
@@ -52,16 +65,32 @@ if(Python3_FOUND)
   add_dependencies(python3-fd bareosfd-python3-module)
 endif()
 
+if(Python3_FOUND)
+  add_library(python3-fd-lib STATIC python-fd.cc)
+  target_link_libraries(python3-fd-lib ${Python3_LIBRARIES} bareos)
+  target_include_directories(
+    python3-fd-lib PUBLIC SYSTEM ${Python3_INCLUDE_DIRS}
+  )
+  target_compile_definitions(
+    python3-fd-lib PUBLIC PY3MODDIR=\"${Python3_SITELIB}\"
+  )
+  add_dependencies(bareos-fd python3-fd-lib)
+  add_dependencies(python3-fd-lib bareosfd-python3-module)
+endif()
+
 if(Python2_FOUND)
   add_executable(bareosfd-python2-module-tester test/python-fd-module-tester.cc)
   target_link_libraries(
-    bareosfd-python2-module-tester ${Python2_LIBRARIES} bareos
+    bareosfd-python2-module-tester ${Python2_LIBRARIES} python2-fd-lib bareos
   )
   target_include_directories(
     bareosfd-python2-module-tester PUBLIC SYSTEM ${Python2_INCLUDE_DIRS}
   )
   target_compile_options(
     bareosfd-python2-module-tester PUBLIC ${Python2_CCSHARED}
+  )
+  target_compile_definitions(
+    bareosfd-python2-module-tester PUBLIC PY2MODDIR=\"${Python2_SITELIB}\"
   )
   add_test(NAME bareosfd-python2-module-tester
            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/bareosfd-python2-module-tester
@@ -80,12 +109,14 @@ endif()
 if(Python3_FOUND AND NOT HAVE_WIN32)
   add_executable(bareosfd-python3-module-tester test/python-fd-module-tester.cc)
   target_link_libraries(
-    bareosfd-python3-module-tester ${Python3_LIBRARIES} bareos
+    bareosfd-python3-module-tester ${Python3_LIBRARIES} python3-fd-lib bareos
   )
   target_include_directories(
     bareosfd-python3-module-tester PUBLIC SYSTEM ${Python3_INCLUDE_DIRS}
   )
-
+  target_compile_definitions(
+    bareosfd-python3-module-tester PUBLIC PY3MODDIR=\"${Python3_SITELIB}\"
+  )
   add_test(NAME bareosfd-python3-module-tester
            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/bareosfd-python3-module-tester
   )

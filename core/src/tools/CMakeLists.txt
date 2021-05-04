@@ -64,6 +64,8 @@ if(NOT HAVE_WIN32)
   list(APPEND TOOLS_SBIN bpluginfo btestls)
 endif()
 
+install(CODE "set(SRC_DIR \"${PROJECT_SOURCE_DIR}\")")
+
 install(TARGETS ${TOOLS_BIN} DESTINATION "${bindir}")
 install(TARGETS ${TOOLS_SBIN} DESTINATION "${sbindir}")
 

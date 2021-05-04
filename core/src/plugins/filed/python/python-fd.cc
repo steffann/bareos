@@ -33,6 +33,7 @@
 #  include <Python.h>
 #  include "include/bareos.h"
 #endif
+#include "plugins/include/python3compat.h"
 #include "include/version_hex.h"
 
 #define PLUGIN_DAEMON "fd"
@@ -92,12 +93,11 @@ static bRC getAcl(PluginContext* plugin_ctx, acl_pkt* ap);
 static bRC setAcl(PluginContext* plugin_ctx, acl_pkt* ap);
 static bRC getXattr(PluginContext* plugin_ctx, xattr_pkt* xp);
 static bRC setXattr(PluginContext* plugin_ctx, xattr_pkt* xp);
-static bRC parse_plugin_definition(PluginContext* plugin_ctx,
-                                   void* value,
-                                   PoolMem& plugin_options);
+bRC parse_plugin_definition(PluginContext* plugin_ctx,
+                            const void* value,
+                            PoolMem& plugin_options);
 
 static void PyErrorHandler(PluginContext* plugin_ctx, int msgtype);
-static bRC PyLoadModule(PluginContext* plugin_ctx, void* value);
 
 /* Pointers to Bareos functions */
 static CoreFunctions* bareos_core_functions = NULL;
@@ -219,6 +219,7 @@ bRC loadPlugin(PluginApiDefinition* lbareos_plugin_interface_version,
 #endif
 
   mainThreadState = PyEval_SaveThread();
+
   return bRC_OK;
 }
 
@@ -758,9 +759,9 @@ static inline void SetStringIfNull(char** destination, char* value)
  *
  * python:module_path=<path>:module_name=<python_module_name>:...
  */
-static bRC parse_plugin_definition(PluginContext* plugin_ctx,
-                                   void* value,
-                                   PoolMem& plugin_options)
+bRC parse_plugin_definition(PluginContext* plugin_ctx,
+                            const void* value,
+                            PoolMem& plugin_options)
 {
   bool found;
   int i, cnt;
@@ -930,6 +931,17 @@ bail_out:
   return bRC_Error;
 }
 
+void PySaveThread() { mainThreadState = PyEval_SaveThread(); }
+
+void PyRestoreThread() { PyEval_RestoreThread(mainThreadState); }
+
+void PyListDump(PluginContext* plugin_ctx, PyObject* list)
+{
+  for (Py_ssize_t i = 0; i < PyList_Size(list); i++) {
+    Dmsg(plugin_ctx, debuglevel, "item %d: %s\n", i,
+         PyUnicode_AsUTF8(PyList_GetItem(list, i)));
+  }
+}
 
 /**
  * Initial load of the Python module.
@@ -938,24 +950,26 @@ bail_out:
  * module path and the module to load. We also load the dictionary used
  * for looking up the Python methods.
  */
-static bRC PyLoadModule(PluginContext* plugin_ctx, void* value)
+bRC PyLoadModule(PluginContext* plugin_ctx, void* value)
 {
   bRC retval = bRC_Error;
   struct plugin_private_context* plugin_priv_ctx
       = (struct plugin_private_context*)plugin_ctx->plugin_private_context;
-  PyObject *sysPath, *mPath, *pName, *pFunc;
+  PyObject *mPath, *pName, *pFunc;
+  PyObject* sysPath = PySys_GetObject((char*)"path");
 
   /* See if we already setup the python search path.  */
   if (!plugin_priv_ctx->python_path_set) {
     /* Extend the Python search path with the given module_path.  */
     if (plugin_priv_ctx->module_path) {
-      sysPath = PySys_GetObject((char*)"path");
       mPath = PyUnicode_FromString(plugin_priv_ctx->module_path);
       PyList_Append(sysPath, mPath);
       Py_DECREF(mPath);
       plugin_priv_ctx->python_path_set = true;
     }
   }
+
+  PyListDump(plugin_ctx, sysPath);
 
   /* Try to load the Python module by name. */
   if (plugin_priv_ctx->module_name) {

@@ -55,5 +55,26 @@ static plugin_argument plugin_arguments[]
        {"module_name", argument_module_name},
        {NULL, argument_none}};
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+bRC loadPlugin(PluginApiDefinition* lbareos_plugin_interface_version,
+               CoreFunctions* lbareos_core_functions,
+               PluginInformation** plugin_information,
+               PluginFunctions** plugin_functions);
+#ifdef __cplusplus
+}
+#endif
+
+bRC parse_plugin_definition(PluginContext* plugin_ctx,
+                            const void* value,
+                            PoolMem& plugin_options);
+
+void PySaveThread();
+void PyRestoreThread();
+
+bRC PyLoadModule(PluginContext* plugin_ctx, void* value);
+
+
 } /* namespace filedaemon */
 #endif  // BAREOS_PLUGINS_FILED_PYTHON_PYTHON_FD_H_

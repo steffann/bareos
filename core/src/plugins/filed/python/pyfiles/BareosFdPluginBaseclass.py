@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # BAREOS - Backup Archiving REcovery Open Sourced
 #
-# Copyright (C) 2014-2020 Bareos GmbH & Co. KG
+# Copyright (C) 2014-2021 Bareos GmbH & Co. KG
 #
 # This program is Free Software; you can redistribute it and/or
 # modify it under the terms of version three of the GNU Affero General Public
@@ -56,9 +56,12 @@ class BareosFdPluginBaseclass(object):
         self.since = bareosfd.GetValue(bVarSinceTime)
         self.level = bareosfd.GetValue(bVarLevel)
         self.jobName = bareosfd.GetValue(bVarJobName)
-        # jobName is of format myName.2020-05-12_11.35.27_05
-        # short Name is everything left of the third point seen from the right
-        self.shortName = self.jobName.rsplit(".", 3)[0]
+        try:
+            # jobName is of format myName.2020-05-12_11.35.27_05
+            # short Name is everything left of the third point seen from the right
+            self.shortName = self.jobName.rsplit(".", 3)[0]
+        except AttributeError:
+            self.shortName = None
         self.workingdir = bareosfd.GetValue(bVarWorkingDir)
         self.startTime = int(time.time())
         self.FNAME = "undef"
