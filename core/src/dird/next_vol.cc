@@ -373,7 +373,7 @@ void CheckIfVolumeValidOrRecyclable(JobControlRecord* jcr,
   }
 }
 
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 bool GetScratchVolume(JobControlRecord* jcr,
                       bool InChanger,
@@ -386,91 +386,91 @@ bool GetScratchVolume(JobControlRecord* jcr,
   bool found = false;
 
   // Only one thread at a time can pull from the scratch pool
-  P(mutex);
-
-  /*
-   * Get Pool record for Scratch Pool
-   * choose between ScratchPoolId and Scratch
-   * GetPoolRecord will first try ScratchPoolId,
-   * and then try the pool named Scratch
-   */
-  bstrncpy(spr.Name, "Scratch", sizeof(spr.Name));
-  spr.PoolId = mr->ScratchPoolId;
-  if (jcr->db->GetPoolRecord(jcr, &spr)) {
-    smr.PoolId = spr.PoolId;
-    if (InChanger) {
-      smr.StorageId = mr->StorageId; /* want only Scratch Volumes in changer */
-    }
-
-    bstrncpy(smr.VolStatus, "Append",
-             sizeof(smr.VolStatus)); /* want only appendable volumes */
-    bstrncpy(smr.MediaType, mr->MediaType, sizeof(smr.MediaType));
+  {
+    std::lock_guard guard(mutex);
 
     /*
-     * If we do not find a valid Scratch volume, try recycling any existing
-     * purged volumes, then try to take the oldest volume.
+     * Get Pool record for Scratch Pool
+     * choose between ScratchPoolId and Scratch
+     * GetPoolRecord will first try ScratchPoolId,
+     * and then try the pool named Scratch
      */
-    SetStorageidInMr(store, &smr); /* put StorageId in new record */
-    if (jcr->db->FindNextVolume(jcr, 1, InChanger, &smr, NULL)) {
-      found = true;
-    } else if (FindRecycledVolume(jcr, InChanger, &smr, store, NULL)) {
-      found = true;
-    } else if (RecycleOldestPurgedVolume(jcr, InChanger, &smr, store, NULL)) {
-      found = true;
-    }
+    bstrncpy(spr.Name, "Scratch", sizeof(spr.Name));
+    spr.PoolId = mr->ScratchPoolId;
+    if (jcr->db->GetPoolRecord(jcr, &spr)) {
+      smr.PoolId = spr.PoolId;
+      if (InChanger) {
+        smr.StorageId
+            = mr->StorageId; /* want only Scratch Volumes in changer */
+      }
 
-    if (found) {
-      PoolMem query(PM_MESSAGE);
+      bstrncpy(smr.VolStatus, "Append",
+               sizeof(smr.VolStatus)); /* want only appendable volumes */
+      bstrncpy(smr.MediaType, mr->MediaType, sizeof(smr.MediaType));
 
       /*
-       * Get pool record where the Scratch Volume will go to ensure that we can
-       * add a Volume.
+       * If we do not find a valid Scratch volume, try recycling any existing
+       * purged volumes, then try to take the oldest volume.
        */
-      PoolDbRecord pr;
-      bstrncpy(pr.Name, jcr->impl->res.pool->resource_name_, sizeof(pr.Name));
-
-      if (!jcr->db->GetPoolRecord(jcr, &pr)) {
-        Jmsg(jcr, M_WARNING, 0, _("Unable to get Pool record: ERR=%s"),
-             jcr->db->strerror());
-        goto bail_out;
+      SetStorageidInMr(store, &smr); /* put StorageId in new record */
+      if (jcr->db->FindNextVolume(jcr, 1, InChanger, &smr, NULL)) {
+        found = true;
+      } else if (FindRecycledVolume(jcr, InChanger, &smr, store, NULL)) {
+        found = true;
+      } else if (RecycleOldestPurgedVolume(jcr, InChanger, &smr, store, NULL)) {
+        found = true;
       }
 
-      // Make sure there is room for another volume
-      if (pr.MaxVols > 0 && pr.NumVols >= pr.MaxVols) {
-        Jmsg(jcr, M_WARNING, 0,
-             _("Unable add Scratch Volume, Pool \"%s\" full MaxVols=%d\n"),
-             jcr->impl->res.pool->resource_name_, pr.MaxVols);
-        goto bail_out;
+      if (found) {
+        PoolMem query(PM_MESSAGE);
+
+        /*
+         * Get pool record where the Scratch Volume will go to ensure that we
+         * can add a Volume.
+         */
+        PoolDbRecord pr;
+        bstrncpy(pr.Name, jcr->impl->res.pool->resource_name_, sizeof(pr.Name));
+
+        if (!jcr->db->GetPoolRecord(jcr, &pr)) {
+          Jmsg(jcr, M_WARNING, 0, _("Unable to get Pool record: ERR=%s"),
+               jcr->db->strerror());
+          return ok;
+        }
+
+        // Make sure there is room for another volume
+        if (pr.MaxVols > 0 && pr.NumVols >= pr.MaxVols) {
+          Jmsg(jcr, M_WARNING, 0,
+               _("Unable add Scratch Volume, Pool \"%s\" full MaxVols=%d\n"),
+               jcr->impl->res.pool->resource_name_, pr.MaxVols);
+          return ok;
+        }
+
+        memcpy(mr, &smr, sizeof(MediaDbRecord));
+        SetStorageidInMr(store, mr);
+
+        // Set default parameters from current pool
+        SetPoolDbrDefaultsInMediaDbr(mr, &pr);
+
+        /*
+         * SetPoolDbrDefaultsInMediaDbr set VolStatus to Append, we could have
+         * Recycled media, also, we retain the old RecyclePoolId.
+         */
+        bstrncpy(mr->VolStatus, smr.VolStatus, sizeof(smr.VolStatus));
+        mr->RecyclePoolId = smr.RecyclePoolId;
+
+        if (!jcr->db->UpdateMediaRecord(jcr, mr)) {
+          Jmsg(jcr, M_WARNING, 0, _("Failed to move Scratch Volume. ERR=%s\n"),
+               jcr->db->strerror());
+          return ok;
+        }
+
+        Jmsg(jcr, M_INFO, 0, _("Using Volume \"%s\" from 'Scratch' pool.\n"),
+             mr->VolumeName);
+
+        ok = true;
       }
-
-      memcpy(mr, &smr, sizeof(MediaDbRecord));
-      SetStorageidInMr(store, mr);
-
-      // Set default parameters from current pool
-      SetPoolDbrDefaultsInMediaDbr(mr, &pr);
-
-      /*
-       * SetPoolDbrDefaultsInMediaDbr set VolStatus to Append, we could have
-       * Recycled media, also, we retain the old RecyclePoolId.
-       */
-      bstrncpy(mr->VolStatus, smr.VolStatus, sizeof(smr.VolStatus));
-      mr->RecyclePoolId = smr.RecyclePoolId;
-
-      if (!jcr->db->UpdateMediaRecord(jcr, mr)) {
-        Jmsg(jcr, M_WARNING, 0, _("Failed to move Scratch Volume. ERR=%s\n"),
-             jcr->db->strerror());
-        goto bail_out;
-      }
-
-      Jmsg(jcr, M_INFO, 0, _("Using Volume \"%s\" from 'Scratch' pool.\n"),
-           mr->VolumeName);
-
-      ok = true;
     }
   }
-
-bail_out:
-  V(mutex);
   return ok;
 }
 } /* namespace directordaemon */
