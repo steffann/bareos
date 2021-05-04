@@ -3,7 +3,7 @@
 
    Copyright (C) 2004-2010 Free Software Foundation Europe e.V.
    Copyright (C) 2011-2012 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -67,7 +67,7 @@ static const int debuglevel = 500;
 
 #define MAX_PATHLENGTH 1024
 
-static pthread_mutex_t com_security_mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex com_security_mutex;
 static bool com_security_initialized = false;
 
 /**
@@ -84,35 +84,36 @@ bool InitializeComSecurity()
   HRESULT hr;
   bool retval = false;
 
-  P(com_security_mutex);
-  if (com_security_initialized) {
+  {
+    std::lock_guard guard(com_security_mutex);
+    if (com_security_initialized) {
+      retval = true;
+      goto bail_out;
+    }
+
+    hr = CoInitializeSecurity(
+        NULL, /*  Allow *all* VSS writers to communicate back! */
+        -1,   /*  Default COM authentication service */
+        NULL, /*  Default COM authorization service */
+        NULL, /*  reserved parameter */
+        RPC_C_AUTHN_LEVEL_PKT_PRIVACY, /*  Strongest COM authentication level */
+        RPC_C_IMP_LEVEL_IDENTIFY,      /*  Minimal impersonation abilities */
+        NULL,      /*  Default COM authentication settings */
+        EOAC_NONE, /*  No special options */
+        NULL);     /*  Reserved parameter */
+
+    if (FAILED(hr)) {
+      Dmsg1(0, "InitializeComSecurity: CoInitializeSecurity returned 0x%08X\n",
+            hr);
+      errno = b_errno_win32;
+      goto bail_out;
+    }
+
+    com_security_initialized = true;
     retval = true;
-    goto bail_out;
-  }
 
-  hr = CoInitializeSecurity(
-      NULL, /*  Allow *all* VSS writers to communicate back! */
-      -1,   /*  Default COM authentication service */
-      NULL, /*  Default COM authorization service */
-      NULL, /*  reserved parameter */
-      RPC_C_AUTHN_LEVEL_PKT_PRIVACY, /*  Strongest COM authentication level */
-      RPC_C_IMP_LEVEL_IDENTIFY,      /*  Minimal impersonation abilities */
-      NULL,                          /*  Default COM authentication settings */
-      EOAC_NONE,                     /*  No special options */
-      NULL);                         /*  Reserved parameter */
-
-  if (FAILED(hr)) {
-    Dmsg1(0, "InitializeComSecurity: CoInitializeSecurity returned 0x%08X\n",
-          hr);
-    errno = b_errno_win32;
-    goto bail_out;
-  }
-
-  com_security_initialized = true;
-  retval = true;
-
-bail_out:
-  V(com_security_mutex);
+  bail_out:
+  };
   return retval;
 }
 
@@ -138,7 +139,7 @@ struct thread_vss_path_convert {
  * pthread_get_specific to have unique and separate data for each thread instead
  * of global variables.
  */
-static pthread_mutex_t tsd_mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex tsd_mutex;
 static bool pc_tsd_initialized = false;
 static bool cc_tsd_initialized = false;
 static pthread_key_t path_conversion_key;
@@ -162,49 +163,49 @@ bool SetVSSPathConvert(t_pVSSPathConvert pPathConvert,
   int status;
   thread_vss_path_convert* tvpc = NULL;
 
-  P(tsd_mutex);
-  if (!pc_tsd_initialized) {
-    status = pthread_key_create(&path_conversion_key, VSSPathConvertCleanup);
-    if (status != 0) {
-      V(tsd_mutex);
+  {
+    std::lock_guard guard(tsd_mutex);
+    if (!pc_tsd_initialized) {
+      status = pthread_key_create(&path_conversion_key, VSSPathConvertCleanup);
+      if (status != 0) {};
       goto bail_out;
     }
     pc_tsd_initialized = true;
   }
-  V(tsd_mutex);
+};
 
-  tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
-  if (!tvpc) {
-    tvpc = (thread_vss_path_convert*)malloc(sizeof(thread_vss_path_convert));
-    status = pthread_setspecific(path_conversion_key, (void*)tvpc);
-    if (status != 0) { goto bail_out; }
-  }
+tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
+if (!tvpc) {
+  tvpc = (thread_vss_path_convert*)malloc(sizeof(thread_vss_path_convert));
+  status = pthread_setspecific(path_conversion_key, (void*)tvpc);
+  if (status != 0) { goto bail_out; }
+}
 
-  Dmsg1(debuglevel,
-        "SetVSSPathConvert: Setup thread specific conversion pointers at "
-        "address %p\n",
-        tvpc);
+Dmsg1(debuglevel,
+      "SetVSSPathConvert: Setup thread specific conversion pointers at "
+      "address %p\n",
+      tvpc);
 
-  tvpc->pPathConvert = pPathConvert;
-  tvpc->pPathConvertW = pPathConvertW;
+tvpc->pPathConvert = pPathConvert;
+tvpc->pPathConvertW = pPathConvertW;
 
-  return true;
+return true;
 
-bail_out:
-  if (tvpc) { free(tvpc); }
+bail_out : if (tvpc) { free(tvpc); }
 
-  return false;
+return false;
 }
 
 static thread_vss_path_convert* Win32GetPathConvert()
 {
   thread_vss_path_convert* tvpc = NULL;
 
-  P(tsd_mutex);
-  if (pc_tsd_initialized) {
-    tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
-  }
-  V(tsd_mutex);
+  {
+    std::lock_guard guard(tsd_mutex);
+    if (pc_tsd_initialized) {
+      tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
+    }
+  };
 
   return tvpc;
 }
@@ -229,68 +230,70 @@ static thread_conversion_cache* Win32ConvInitCache()
   int status;
   thread_conversion_cache* tcc = NULL;
 
-  P(tsd_mutex);
-  if (!cc_tsd_initialized) {
-    status = pthread_key_create(&conversion_cache_key, Win32ConvCleanupCache);
-    if (status != 0) {
-      V(tsd_mutex);
+  {
+    std::lock_guard guard(tsd_mutex);
+    if (!cc_tsd_initialized) {
+      status = pthread_key_create(&conversion_cache_key, Win32ConvCleanupCache);
+      if (status != 0) {};
       goto bail_out;
     }
     cc_tsd_initialized = true;
   }
-  V(tsd_mutex);
+};
 
-  // Create a new cache.
-  tcc = (thread_conversion_cache*)malloc(sizeof(thread_conversion_cache));
-  tcc->pWin32ConvUTF8Cache = GetPoolMemory(PM_FNAME);
-  tcc->pWin32ConvUCS2Cache = GetPoolMemory(PM_FNAME);
-  tcc->dwWin32ConvUTF8strlen = 0;
+// Create a new cache.
+tcc = (thread_conversion_cache*)malloc(sizeof(thread_conversion_cache));
+tcc->pWin32ConvUTF8Cache = GetPoolMemory(PM_FNAME);
+tcc->pWin32ConvUCS2Cache = GetPoolMemory(PM_FNAME);
+tcc->dwWin32ConvUTF8strlen = 0;
 
-  status = pthread_setspecific(conversion_cache_key, (void*)tcc);
-  if (status != 0) { goto bail_out; }
+status = pthread_setspecific(conversion_cache_key, (void*)tcc);
+if (status != 0) { goto bail_out; }
 
-  Dmsg1(debuglevel,
-        "Win32ConvInitCache: Setup of thread specific cache at address %p\n",
-        tcc);
+Dmsg1(debuglevel,
+      "Win32ConvInitCache: Setup of thread specific cache at address %p\n",
+      tcc);
 
-  return tcc;
+return tcc;
 
-bail_out:
-  if (tcc) {
-    FreePoolMemory(tcc->pWin32ConvUCS2Cache);
-    FreePoolMemory(tcc->pWin32ConvUTF8Cache);
-    free(tcc);
-  }
+bail_out : if (tcc)
+{
+  FreePoolMemory(tcc->pWin32ConvUCS2Cache);
+  FreePoolMemory(tcc->pWin32ConvUTF8Cache);
+  free(tcc);
+}
 
-  return NULL;
+return NULL;
 }
 
 static thread_conversion_cache* Win32GetCache()
 {
   thread_conversion_cache* tcc = NULL;
 
-  P(tsd_mutex);
-  if (cc_tsd_initialized) {
-    tcc = (thread_conversion_cache*)pthread_getspecific(conversion_cache_key);
-  }
-  V(tsd_mutex);
+  {
+    std::lock_guard guard(tsd_mutex);
+    if (cc_tsd_initialized) {
+      tcc = (thread_conversion_cache*)pthread_getspecific(conversion_cache_key);
+    }
+  };
 
   return tcc;
 }
 
 void Win32TSDCleanup()
 {
-  P(tsd_mutex);
-  if (pc_tsd_initialized) {
-    pthread_key_delete(path_conversion_key);
-    pc_tsd_initialized = false;
-  }
+  {
+    std::lock_guard guard(tsd_mutex);
+    if (pc_tsd_initialized) {
+      pthread_key_delete(path_conversion_key);
+      pc_tsd_initialized = false;
+    }
 
-  if (cc_tsd_initialized) {
-    pthread_key_delete(conversion_cache_key);
-    cc_tsd_initialized = false;
-  }
-  V(tsd_mutex);
+    if (cc_tsd_initialized) {
+      pthread_key_delete(conversion_cache_key);
+      cc_tsd_initialized = false;
+    }
+  };
 }
 
 // Special flag used to enable or disable Bacula compatible win32 encoding.
