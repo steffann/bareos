@@ -2,7 +2,7 @@
    BAREOS® - Backup Archiving REcovery Open Sourced
 
    Copyright (C) 2011-2012 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -122,7 +122,7 @@ static bool quit = false;
 static bool ndmp_initialized = false;
 static pthread_t ndmp_tid;
 static struct ndmp_thread_server_args ndmp_thread_server_args;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 /* Forward referenced functions */
 
@@ -1312,9 +1312,10 @@ extern "C" void* ndmp_thread_server(void* arg)
         }
 
         // See who client is. i.e. who connected to us.
-        P(mutex);
-        SockaddrToAscii(&cli_addr, buf, sizeof(buf));
-        V(mutex);
+        {
+          std::lock_guard guard(mutex);
+          SockaddrToAscii(&cli_addr, buf, sizeof(buf));
+        };
 
         struct ndmp_session_handle* new_handle;
         new_handle = (struct ndmp_session_handle*)malloc(
