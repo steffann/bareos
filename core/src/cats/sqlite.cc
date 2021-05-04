@@ -3,7 +3,7 @@
 
    Copyright (C) 2000-2011 Free Software Foundation Europe e.V.
    Copyright (C) 2011-2016 Planets Communications B.V.
-   Copyright (C) 2013-2020 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -146,67 +146,68 @@ bool BareosDbSqlite::OpenDatabase(JobControlRecord* jcr)
   int errstat;
   int retry = 0;
 
-  {std::lock_guard guard(mutex);
-  if (connected_) {
-    retval = true;
-    goto bail_out;
-  }
-
-  if ((errstat = RwlInit(&lock_)) != 0) {
-    BErrNo be;
-    Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
-          be.bstrerror(errstat));
-    goto bail_out;
-  }
-
-  // Open the database
-  len = strlen(working_directory) + strlen(db_name_) + 5;
-  db_path = (char*)malloc(len);
-  strcpy(db_path, working_directory);
-  strcat(db_path, "/");
-  strcat(db_path, db_name_);
-  strcat(db_path, ".db");
-  if (stat(db_path, &statbuf) != 0) {
-    Mmsg1(errmsg, _("Database %s does not exist, please create it.\n"),
-          db_path);
-    free(db_path);
-    goto bail_out;
-  }
-
-  for (db_handle_ = NULL; !db_handle_ && retry++ < 10;) {
-    status = sqlite3_open(db_path, &db_handle_);
-    if (status != SQLITE_OK) {
-      lowlevel_errmsg_ = (char*)sqlite3_errmsg(db_handle_);
-      sqlite3_close(db_handle_);
-      db_handle_ = NULL;
-    } else {
-      lowlevel_errmsg_ = NULL;
+  {
+    std::lock_guard guard(mutex);
+    if (connected_) {
+      retval = true;
+      goto bail_out;
     }
 
-    Dmsg0(300, "sqlite_open\n");
-    if (!db_handle_) { Bmicrosleep(1, 0); }
-  }
-  if (db_handle_ == NULL) {
-    Mmsg2(errmsg, _("Unable to open Database=%s. ERR=%s\n"), db_path,
-          lowlevel_errmsg_ ? lowlevel_errmsg_ : _("unknown"));
-    free(db_path);
-    goto bail_out;
-  }
-  connected_ = true;
-  free(db_path);
+    if ((errstat = RwlInit(&lock_)) != 0) {
+      BErrNo be;
+      Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
+            be.bstrerror(errstat));
+      goto bail_out;
+    }
 
-  // Set busy handler to wait when we use mult_db_connections = true
-  sqlite3_busy_handler(db_handle_, SqliteBusyHandler, NULL);
+    // Open the database
+    len = strlen(working_directory) + strlen(db_name_) + 5;
+    db_path = (char*)malloc(len);
+    strcpy(db_path, working_directory);
+    strcat(db_path, "/");
+    strcat(db_path, db_name_);
+    strcat(db_path, ".db");
+    if (stat(db_path, &statbuf) != 0) {
+      Mmsg1(errmsg, _("Database %s does not exist, please create it.\n"),
+            db_path);
+      free(db_path);
+      goto bail_out;
+    }
+
+    for (db_handle_ = NULL; !db_handle_ && retry++ < 10;) {
+      status = sqlite3_open(db_path, &db_handle_);
+      if (status != SQLITE_OK) {
+        lowlevel_errmsg_ = (char*)sqlite3_errmsg(db_handle_);
+        sqlite3_close(db_handle_);
+        db_handle_ = NULL;
+      } else {
+        lowlevel_errmsg_ = NULL;
+      }
+
+      Dmsg0(300, "sqlite_open\n");
+      if (!db_handle_) { Bmicrosleep(1, 0); }
+    }
+    if (db_handle_ == NULL) {
+      Mmsg2(errmsg, _("Unable to open Database=%s. ERR=%s\n"), db_path,
+            lowlevel_errmsg_ ? lowlevel_errmsg_ : _("unknown"));
+      free(db_path);
+      goto bail_out;
+    }
+    connected_ = true;
+    free(db_path);
+
+    // Set busy handler to wait when we use mult_db_connections = true
+    sqlite3_busy_handler(db_handle_, SqliteBusyHandler, NULL);
 
 #  if defined(SQLITE3_INIT_QUERY)
-  SqlQueryWithoutHandler(SQLITE3_INIT_QUERY);
+    SqlQueryWithoutHandler(SQLITE3_INIT_QUERY);
 #  endif
 
-  if (!CheckTablesVersion(jcr)) { goto bail_out; }
+    if (!CheckTablesVersion(jcr)) { goto bail_out; }
 
-  retval = true;
+    retval = true;
 
-bail_out:
+  bail_out:
   };
   return retval;
 }
@@ -214,29 +215,30 @@ bail_out:
 void BareosDbSqlite::CloseDatabase(JobControlRecord* jcr)
 {
   if (connected_) { EndTransaction(jcr); }
-  {std::lock_guard guard(mutex);
-  ref_count_--;
-  if (ref_count_ == 0) {
-    if (connected_) { SqlFreeResult(); }
-    db_list->remove(this);
-    if (connected_ && db_handle_) { sqlite3_close(db_handle_); }
-    if (RwlIsInit(&lock_)) { RwlDestroy(&lock_); }
-    FreePoolMemory(errmsg);
-    FreePoolMemory(cmd);
-    FreePoolMemory(cached_path);
-    FreePoolMemory(fname);
-    FreePoolMemory(path);
-    FreePoolMemory(esc_name);
-    FreePoolMemory(esc_path);
-    FreePoolMemory(esc_obj);
-    if (db_driver_) { free(db_driver_); }
-    if (db_name_) { free(db_name_); }
-    delete this;
-    if (db_list->size() == 0) {
-      delete db_list;
-      db_list = NULL;
+  {
+    std::lock_guard guard(mutex);
+    ref_count_--;
+    if (ref_count_ == 0) {
+      if (connected_) { SqlFreeResult(); }
+      db_list->remove(this);
+      if (connected_ && db_handle_) { sqlite3_close(db_handle_); }
+      if (RwlIsInit(&lock_)) { RwlDestroy(&lock_); }
+      FreePoolMemory(errmsg);
+      FreePoolMemory(cmd);
+      FreePoolMemory(cached_path);
+      FreePoolMemory(fname);
+      FreePoolMemory(path);
+      FreePoolMemory(esc_name);
+      FreePoolMemory(esc_path);
+      FreePoolMemory(esc_obj);
+      if (db_driver_) { free(db_driver_); }
+      if (db_name_) { free(db_name_); }
+      delete this;
+      if (db_list->size() == 0) {
+        delete db_list;
+        db_list = NULL;
+      }
     }
-  }
   };
 }
 
@@ -666,27 +668,28 @@ BareosDb* db_init_database(JobControlRecord* jcr,
 {
   BareosDb* mdb = NULL;
 
-  {std::lock_guard guard(mutex); /* lock DB queue */
+  {
+    std::lock_guard guard(mutex); /* lock DB queue */
 
-  // Look to see if DB already open
-  if (db_list && !mult_db_connections && !need_private) {
-    foreach_dlist (mdb, db_list) {
-      if (mdb->IsPrivate()) { continue; }
+    // Look to see if DB already open
+    if (db_list && !mult_db_connections && !need_private) {
+      foreach_dlist (mdb, db_list) {
+        if (mdb->IsPrivate()) { continue; }
 
-      if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
-        Dmsg1(300, "DB REopen %s\n", db_name);
-        mdb->IncrementRefcount();
-        goto bail_out;
+        if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
+          Dmsg1(300, "DB REopen %s\n", db_name);
+          mdb->IncrementRefcount();
+          goto bail_out;
+        }
       }
     }
-  }
-  Dmsg0(300, "db_init_database first time\n");
-  mdb = new BareosDbSqlite(jcr, db_driver, db_name, db_user, db_password,
-                           db_address, db_port, db_socket, mult_db_connections,
-                           disable_batch_insert, try_reconnect, exit_on_fatal,
-                           need_private);
+    Dmsg0(300, "db_init_database first time\n");
+    mdb = new BareosDbSqlite(jcr, db_driver, db_name, db_user, db_password,
+                             db_address, db_port, db_socket,
+                             mult_db_connections, disable_batch_insert,
+                             try_reconnect, exit_on_fatal, need_private);
 
-bail_out:
+  bail_out:
   };
   return mdb;
 }
