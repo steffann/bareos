@@ -146,114 +146,114 @@ bool BareosDbMysql::OpenDatabase(JobControlRecord* jcr)
   my_bool reconnect = 1;
 #  endif
 
-  P(mutex);
-  if (connected_) {
-    retval = true;
-    goto bail_out;
-  }
+  {
+    std::lock_guard guard(mutex);
+    if (connected_) {
+      retval = true;
+      return retval;
+    }
 
-  if ((errstat = RwlInit(&lock_)) != 0) {
-    BErrNo be;
-    Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
-          be.bstrerror(errstat));
-    goto bail_out;
-  }
+    if ((errstat = RwlInit(&lock_)) != 0) {
+      BErrNo be;
+      Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
+            be.bstrerror(errstat));
+      return retval;
+    }
 
-  mysql_init(&instance_);
+    mysql_init(&instance_);
 
-  Dmsg0(50, "mysql_init done\n");
-  // If connection fails, try at 5 sec intervals for 30 seconds.
-  for (int retry = 0; retry < 6; retry++) {
-    db_handle_ = mysql_real_connect(&instance_,   /* db */
-                                    db_address_,  /* default = localhost */
-                                    db_user_,     /* login name */
-                                    db_password_, /* password */
-                                    db_name_,     /* database name */
-                                    db_port_,     /* default port */
-                                    db_socket_,   /* default = socket */
-                                    CLIENT_FOUND_ROWS); /* flags */
+    Dmsg0(50, "mysql_init done\n");
+    // If connection fails, try at 5 sec intervals for 30 seconds.
+    for (int retry = 0; retry < 6; retry++) {
+      db_handle_ = mysql_real_connect(&instance_,   /* db */
+                                      db_address_,  /* default = localhost */
+                                      db_user_,     /* login name */
+                                      db_password_, /* password */
+                                      db_name_,     /* database name */
+                                      db_port_,     /* default port */
+                                      db_socket_,   /* default = socket */
+                                      CLIENT_FOUND_ROWS); /* flags */
 
-    // If no connect, try once more in case it is a timing problem
-    if (db_handle_ != NULL) { break; }
-    Bmicrosleep(5, 0);
-  }
+      // If no connect, try once more in case it is a timing problem
+      if (db_handle_ != NULL) { break; }
+      Bmicrosleep(5, 0);
+    }
 
-  mysql_options(&instance_, MYSQL_OPT_RECONNECT,
-                &reconnect); /* so connection does not timeout */
-  Dmsg0(50, "mysql_real_connect done\n");
-  Dmsg3(50, "db_user=%s db_name=%s db_password=%s\n", db_user_, db_name_,
-        (db_password_ == NULL) ? "(NULL)" : db_password_);
+    mysql_options(&instance_, MYSQL_OPT_RECONNECT,
+                  &reconnect); /* so connection does not timeout */
+    Dmsg0(50, "mysql_real_connect done\n");
+    Dmsg3(50, "db_user=%s db_name=%s db_password=%s\n", db_user_, db_name_,
+          (db_password_ == NULL) ? "(NULL)" : db_password_);
 
-  if (db_handle_ == NULL) {
-    Mmsg2(errmsg,
-          _("Unable to connect to MySQL server.\n"
-            "Database=%s User=%s\n"
-            "MySQL connect failed either server not running or your "
-            "authorization is incorrect.\n"),
-          db_name_, db_user_);
+    if (db_handle_ == NULL) {
+      Mmsg2(errmsg,
+            _("Unable to connect to MySQL server.\n"
+              "Database=%s User=%s\n"
+              "MySQL connect failed either server not running or your "
+              "authorization is incorrect.\n"),
+            db_name_, db_user_);
 #  if MYSQL_VERSION_ID >= 40101
-    Dmsg3(50, "Error %u (%s): %s\n", mysql_errno(&(instance_)),
-          mysql_sqlstate(&(instance_)), mysql_error(&(instance_)));
+      Dmsg3(50, "Error %u (%s): %s\n", mysql_errno(&(instance_)),
+            mysql_sqlstate(&(instance_)), mysql_error(&(instance_)));
 #  else
-    Dmsg2(50, "Error %u: %s\n", mysql_errno(&(instance_)),
-          mysql_error(&(instance_)));
+      Dmsg2(50, "Error %u: %s\n", mysql_errno(&(instance_)),
+            mysql_error(&(instance_)));
 #  endif
-    goto bail_out;
+      return retval;
+    }
+
+    connected_ = true;
+    if (!CheckTablesVersion(jcr)) { return retval; }
+
+    Dmsg3(100, "opendb ref=%d connected=%d db=%p\n", ref_count_, connected_,
+          db_handle_);
+
+    // Set connection timeout to 8 days specially for batch mode
+    SqlQueryWithoutHandler("SET wait_timeout=691200");
+    SqlQueryWithoutHandler("SET interactive_timeout=691200");
+
+    retval = true;
   }
-
-  connected_ = true;
-  if (!CheckTablesVersion(jcr)) { goto bail_out; }
-
-  Dmsg3(100, "opendb ref=%d connected=%d db=%p\n", ref_count_, connected_,
-        db_handle_);
-
-  // Set connection timeout to 8 days specialy for batch mode
-  SqlQueryWithoutHandler("SET wait_timeout=691200");
-  SqlQueryWithoutHandler("SET interactive_timeout=691200");
-
-  retval = true;
-
-bail_out:
-  V(mutex);
   return retval;
 }
 
 void BareosDbMysql::CloseDatabase(JobControlRecord* jcr)
 {
   if (connected_) { EndTransaction(jcr); }
-  P(mutex);
-  ref_count_--;
-  Dmsg3(100, "closedb ref=%d connected=%d db=%p\n", ref_count_, connected_,
-        db_handle_);
-  if (ref_count_ == 0) {
-    if (connected_) { SqlFreeResult(); }
-    db_list->remove(this);
-    if (connected_) {
-      Dmsg1(100, "close db=%p\n", db_handle_);
-      mysql_close(&instance_);
-    }
-    if (RwlIsInit(&lock_)) { RwlDestroy(&lock_); }
-    FreePoolMemory(errmsg);
-    FreePoolMemory(cmd);
-    FreePoolMemory(cached_path);
-    FreePoolMemory(fname);
-    FreePoolMemory(path);
-    FreePoolMemory(esc_name);
-    FreePoolMemory(esc_path);
-    FreePoolMemory(esc_obj);
-    if (db_driver_) { free(db_driver_); }
-    if (db_name_) { free(db_name_); }
-    if (db_user_) { free(db_user_); }
-    if (db_password_) { free(db_password_); }
-    if (db_address_) { free(db_address_); }
-    if (db_socket_) { free(db_socket_); }
-    delete this;
-    if (db_list->size() == 0) {
-      delete db_list;
-      db_list = NULL;
+  {
+    std::lock_guard guard(mutex);
+    ref_count_--;
+    Dmsg3(100, "closedb ref=%d connected=%d db=%p\n", ref_count_, connected_,
+          db_handle_);
+    if (ref_count_ == 0) {
+      if (connected_) { SqlFreeResult(); }
+      db_list->remove(this);
+      if (connected_) {
+        Dmsg1(100, "close db=%p\n", db_handle_);
+        mysql_close(&instance_);
+      }
+      if (RwlIsInit(&lock_)) { RwlDestroy(&lock_); }
+      FreePoolMemory(errmsg);
+      FreePoolMemory(cmd);
+      FreePoolMemory(cached_path);
+      FreePoolMemory(fname);
+      FreePoolMemory(path);
+      FreePoolMemory(esc_name);
+      FreePoolMemory(esc_path);
+      FreePoolMemory(esc_obj);
+      if (db_driver_) { free(db_driver_); }
+      if (db_name_) { free(db_name_); }
+      if (db_user_) { free(db_user_); }
+      if (db_password_) { free(db_password_); }
+      if (db_address_) { free(db_address_); }
+      if (db_socket_) { free(db_socket_); }
+      delete this;
+      if (db_list->size() == 0) {
+        delete db_list;
+        db_list = NULL;
+      }
     }
   }
-  V(mutex);
 }
 
 bool BareosDbMysql::ValidateConnection(void)
@@ -676,28 +676,27 @@ BareosDb* db_init_database(JobControlRecord* jcr,
     Jmsg(jcr, M_FATAL, 0, _("A user name for MySQL must be supplied.\n"));
     return NULL;
   }
-  P(mutex); /* lock DB queue */
+  {
+    std::lock_guard guard(mutex); /* lock DB queue */
 
-  // Look to see if DB already open
-  if (db_list && !mult_db_connections && !need_private) {
-    foreach_dlist (mdb, db_list) {
-      if (mdb->IsPrivate()) { continue; }
+    // Look to see if DB already open
+    if (db_list && !mult_db_connections && !need_private) {
+      foreach_dlist (mdb, db_list) {
+        if (mdb->IsPrivate()) { continue; }
 
-      if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
-        Dmsg1(100, "DB REopen %s\n", db_name);
-        mdb->IncrementRefcount();
-        goto bail_out;
+        if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
+          Dmsg1(100, "DB REopen %s\n", db_name);
+          mdb->IncrementRefcount();
+          return mdb;
+        }
       }
     }
+    Dmsg0(100, "db_init_database first time\n");
+    mdb = new BareosDbMysql(jcr, db_driver, db_name, db_user, db_password,
+                            db_address, db_port, db_socket, mult_db_connections,
+                            disable_batch_insert, try_reconnect, exit_on_fatal,
+                            need_private);
   }
-  Dmsg0(100, "db_init_database first time\n");
-  mdb = new BareosDbMysql(jcr, db_driver, db_name, db_user, db_password,
-                          db_address, db_port, db_socket, mult_db_connections,
-                          disable_batch_insert, try_reconnect, exit_on_fatal,
-                          need_private);
-
-bail_out:
-  V(mutex);
   return mdb;
 }
 

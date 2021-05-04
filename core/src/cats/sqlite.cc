@@ -150,14 +150,14 @@ bool BareosDbSqlite::OpenDatabase(JobControlRecord* jcr)
     std::lock_guard guard(mutex);
     if (connected_) {
       retval = true;
-      goto bail_out;
+      return retval;
     }
 
     if ((errstat = RwlInit(&lock_)) != 0) {
       BErrNo be;
       Mmsg1(errmsg, _("Unable to initialize DB lock. ERR=%s\n"),
             be.bstrerror(errstat));
-      goto bail_out;
+      return retval;
     }
 
     // Open the database
@@ -171,7 +171,7 @@ bool BareosDbSqlite::OpenDatabase(JobControlRecord* jcr)
       Mmsg1(errmsg, _("Database %s does not exist, please create it.\n"),
             db_path);
       free(db_path);
-      goto bail_out;
+      return retval;
     }
 
     for (db_handle_ = NULL; !db_handle_ && retry++ < 10;) {
@@ -191,7 +191,7 @@ bool BareosDbSqlite::OpenDatabase(JobControlRecord* jcr)
       Mmsg2(errmsg, _("Unable to open Database=%s. ERR=%s\n"), db_path,
             lowlevel_errmsg_ ? lowlevel_errmsg_ : _("unknown"));
       free(db_path);
-      goto bail_out;
+      return retval;
     }
     connected_ = true;
     free(db_path);
@@ -203,12 +203,10 @@ bool BareosDbSqlite::OpenDatabase(JobControlRecord* jcr)
     SqlQueryWithoutHandler(SQLITE3_INIT_QUERY);
 #  endif
 
-    if (!CheckTablesVersion(jcr)) { goto bail_out; }
+    if (!CheckTablesVersion(jcr)) { return retval; }
 
     retval = true;
-
-  bail_out:
-  };
+  }
   return retval;
 }
 
@@ -679,7 +677,7 @@ BareosDb* db_init_database(JobControlRecord* jcr,
         if (mdb->MatchDatabase(db_driver, db_name, db_address, db_port)) {
           Dmsg1(300, "DB REopen %s\n", db_name);
           mdb->IncrementRefcount();
-          goto bail_out;
+          return mdb;
         }
       }
     }
@@ -688,9 +686,7 @@ BareosDb* db_init_database(JobControlRecord* jcr,
                              db_address, db_port, db_socket,
                              mult_db_connections, disable_batch_insert,
                              try_reconnect, exit_on_fatal, need_private);
-
-  bail_out:
-  };
+  }
   return mdb;
 }
 
