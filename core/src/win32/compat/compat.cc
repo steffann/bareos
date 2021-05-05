@@ -88,7 +88,7 @@ bool InitializeComSecurity()
     std::lock_guard<std::mutex> guard(com_security_mutex);
     if (com_security_initialized) {
       retval = true;
-      goto bail_out;
+      return retval;
     }
 
     hr = CoInitializeSecurity(
@@ -106,14 +106,12 @@ bool InitializeComSecurity()
       Dmsg1(0, "InitializeComSecurity: CoInitializeSecurity returned 0x%08X\n",
             hr);
       errno = b_errno_win32;
-      goto bail_out;
+      return retval;
     }
 
     com_security_initialized = true;
     retval = true;
-
-  bail_out:
-  };
+  }
   return retval;
 }
 
@@ -172,28 +170,28 @@ bool SetVSSPathConvert(t_pVSSPathConvert pPathConvert,
     }
     pc_tsd_initialized = true;
   }
-};
 
-tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
-if (!tvpc) {
-  tvpc = (thread_vss_path_convert*)malloc(sizeof(thread_vss_path_convert));
-  status = pthread_setspecific(path_conversion_key, (void*)tvpc);
-  if (status != 0) { goto bail_out; }
-}
+  tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
+  if (!tvpc) {
+    tvpc = (thread_vss_path_convert*)malloc(sizeof(thread_vss_path_convert));
+    status = pthread_setspecific(path_conversion_key, (void*)tvpc);
+    if (status != 0) { goto bail_out; }
+  }
 
-Dmsg1(debuglevel,
-      "SetVSSPathConvert: Setup thread specific conversion pointers at "
-      "address %p\n",
-      tvpc);
+  Dmsg1(debuglevel,
+        "SetVSSPathConvert: Setup thread specific conversion pointers at "
+        "address %p\n",
+        tvpc);
 
-tvpc->pPathConvert = pPathConvert;
-tvpc->pPathConvertW = pPathConvertW;
+  tvpc->pPathConvert = pPathConvert;
+  tvpc->pPathConvertW = pPathConvertW;
 
-return true;
+  return true;
 
-bail_out : if (tvpc) { free(tvpc); }
+bail_out:
+  if (tvpc) { free(tvpc); }
 
-return false;
+  return false;
 }
 
 static thread_vss_path_convert* Win32GetPathConvert()
@@ -275,7 +273,7 @@ static thread_conversion_cache* Win32GetCache()
     if (cc_tsd_initialized) {
       tcc = (thread_conversion_cache*)pthread_getspecific(conversion_cache_key);
     }
-  };
+  }
 
   return tcc;
 }
@@ -293,7 +291,7 @@ void Win32TSDCleanup()
       pthread_key_delete(conversion_cache_key);
       cc_tsd_initialized = false;
     }
-  };
+  }
 }
 
 // Special flag used to enable or disable Bacula compatible win32 encoding.
