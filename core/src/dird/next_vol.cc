@@ -387,7 +387,7 @@ bool GetScratchVolume(JobControlRecord* jcr,
 
   // Only one thread at a time can pull from the scratch pool
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
 
     /*
      * Get Pool record for Scratch Pool

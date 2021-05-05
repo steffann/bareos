@@ -69,7 +69,7 @@ static inline void delay()
 
   // Single thread all failures to avoid DOS
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     Bmicrosleep(6, 0);
   };
 }

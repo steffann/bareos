@@ -186,7 +186,7 @@ bool BareosDbPostgresql::OpenDatabase(JobControlRecord* jcr)
   char buf[10], *port;
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     if (connected_) {
       retval = true;
       return retval;
@@ -261,7 +261,7 @@ void BareosDbPostgresql::CloseDatabase(JobControlRecord* jcr)
 {
   if (connected_) { EndTransaction(jcr); }
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     ref_count_--;
     if (ref_count_ == 0) {
       if (connected_) { SqlFreeResult(); }
@@ -951,7 +951,7 @@ BareosDb* db_init_database(JobControlRecord* jcr,
     return NULL;
   }
   {
-    std::lock_guard guard(mutex); /* lock DB queue */
+    std::lock_guard<std::mutex> guard(mutex); /* lock DB queue */
 
     // Look to see if DB already open
     if (db_list && !mult_db_connections && !need_private) {

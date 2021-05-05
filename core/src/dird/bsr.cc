@@ -251,7 +251,7 @@ static void MakeUniqueRestoreFilename(UaContext* ua, PoolMem& fname)
     jcr->impl->unlink_bsr = false;
   } else {
     {
-      std::lock_guard guard(mutex);
+      std::lock_guard<std::mutex> guard(mutex);
       uniq++;
     };
     Mmsg(fname, "%s/%s.restore.%u.bsr", working_directory, my_name, uniq);

@@ -128,7 +128,7 @@ bool BeginDataSpool(DeviceControlRecord* dcr)
       dcr->spooling = true;
       Jmsg(dcr->jcr, M_INFO, 0, _("Spooling data ...\n"));
       {
-        std::lock_guard guard(mutex);
+        std::lock_guard<std::mutex> guard(mutex);
         spool_stats.data_jobs++;
       };
     }
@@ -218,7 +218,7 @@ static bool CloseDataSpoolFile(DeviceControlRecord* dcr, bool end_of_spool)
   FreePoolMemory(name);
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     spool_stats.data_jobs--;
     if (end_of_spool) { spool_stats.total_data_jobs++; }
     if (spool_stats.data_size < dcr->job_spool_size) {
@@ -397,7 +397,7 @@ static bool DespoolData(DeviceControlRecord* dcr, bool commit)
     }
 
     {
-      std::lock_guard guard(mutex);
+      std::lock_guard<std::mutex> guard(mutex);
       if (spool_stats.data_size < dcr->job_spool_size) {
         spool_stats.data_size = 0;
       } else {
@@ -526,7 +526,7 @@ bool WriteBlockToSpoolFile(DeviceControlRecord* dcr)
   }
   V(dcr->dev->spool_mutex);
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     spool_stats.data_size += hlen + wlen;
     if (spool_stats.data_size > spool_stats.max_data_size) {
       spool_stats.max_data_size = spool_stats.data_size;
@@ -709,7 +709,7 @@ bool DiscardAttributeSpool(JobControlRecord* jcr)
 static void UpdateAttrSpoolSize(ssize_t size)
 {
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     if (size > 0) {
       if ((spool_stats.attr_size - size) > 0) {
         spool_stats.attr_size -= size;
@@ -805,7 +805,7 @@ bool CommitAttributeSpool(JobControlRecord* jcr)
     }
 
     {
-      std::lock_guard guard(mutex);
+      std::lock_guard<std::mutex> guard(mutex);
       if (spool_stats.attr_size + size > spool_stats.max_attr_size) {
         spool_stats.max_attr_size = spool_stats.attr_size + size;
       }
@@ -849,7 +849,7 @@ static bool OpenAttrSpoolFile(JobControlRecord* jcr, BareosSocket* bs)
   }
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     spool_stats.attr_jobs++;
   };
 
@@ -870,7 +870,7 @@ static bool CloseAttrSpoolFile(JobControlRecord* jcr, BareosSocket* bs)
   name = GetPoolMemory(PM_MESSAGE);
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     spool_stats.attr_jobs--;
     spool_stats.total_attr_jobs++;
   };

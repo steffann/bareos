@@ -170,7 +170,7 @@ bool StorageDaemonDeviceControlRecord::DirGetVolumeInfo(
   BareosSocket* dir = jcr->dir_bsock;
 
   {
-    std::lock_guard guard(vol_info_mutex);
+    std::lock_guard<std::mutex> guard(vol_info_mutex);
     setVolCatName(VolumeName);
     BashSpaces(getVolCatName());
     dir->fsend(Get_Vol_Info, jcr->Job, getVolCatName(),
@@ -210,7 +210,7 @@ bool StorageDaemonDeviceControlRecord::DirFindNextAppendableVolume()
    */
   LockVolumes();
   {
-    std::lock_guard guard(vol_info_mutex);
+    std::lock_guard<std::mutex> guard(vol_info_mutex);
     ClearFoundInUse();
 
     PmStrcpy(unwanted_volumes, "");
@@ -292,7 +292,7 @@ bool StorageDaemonDeviceControlRecord::DirUpdateVolumeInfo(
 
   // Lock during Volume update
   {
-    std::lock_guard guard(vol_info_mutex);
+    std::lock_guard<std::mutex> guard(vol_info_mutex);
     Dmsg1(debuglevel, "Update cat VolBytes=%lld\n", vol->VolCatBytes);
 
     // Just labeled or relabeled the tape

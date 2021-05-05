@@ -850,7 +850,7 @@ static bRC bareosGetInstanceCount(PluginContext* ctx, int* ret)
   if (!IsCtxGood(ctx, jcr, bctx)) { goto bail_out; }
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
 
     cnt = 0;
     foreach_jcr (njcr) {

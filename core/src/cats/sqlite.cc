@@ -147,7 +147,7 @@ bool BareosDbSqlite::OpenDatabase(JobControlRecord* jcr)
   int retry = 0;
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     if (connected_) {
       retval = true;
       return retval;
@@ -214,7 +214,7 @@ void BareosDbSqlite::CloseDatabase(JobControlRecord* jcr)
 {
   if (connected_) { EndTransaction(jcr); }
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     ref_count_--;
     if (ref_count_ == 0) {
       if (connected_) { SqlFreeResult(); }
@@ -667,7 +667,7 @@ BareosDb* db_init_database(JobControlRecord* jcr,
   BareosDb* mdb = NULL;
 
   {
-    std::lock_guard guard(mutex); /* lock DB queue */
+    std::lock_guard<std::mutex> guard(mutex); /* lock DB queue */
 
     // Look to see if DB already open
     if (db_list && !mult_db_connections && !need_private) {

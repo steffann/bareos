@@ -147,7 +147,7 @@ bool BareosDbMysql::OpenDatabase(JobControlRecord* jcr)
 #  endif
 
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     if (connected_) {
       retval = true;
       return retval;
@@ -221,7 +221,7 @@ void BareosDbMysql::CloseDatabase(JobControlRecord* jcr)
 {
   if (connected_) { EndTransaction(jcr); }
   {
-    std::lock_guard guard(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     ref_count_--;
     Dmsg3(100, "closedb ref=%d connected=%d db=%p\n", ref_count_, connected_,
           db_handle_);
@@ -677,7 +677,7 @@ BareosDb* db_init_database(JobControlRecord* jcr,
     return NULL;
   }
   {
-    std::lock_guard guard(mutex); /* lock DB queue */
+    std::lock_guard<std::mutex> guard(mutex); /* lock DB queue */
 
     // Look to see if DB already open
     if (db_list && !mult_db_connections && !need_private) {

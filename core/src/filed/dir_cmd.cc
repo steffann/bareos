@@ -1320,7 +1320,7 @@ static bool BootstrapCmd(JobControlRecord* jcr)
 
   FreeBootstrap(jcr);
   {
-    std::lock_guard guard(bsr_mutex);
+    std::lock_guard<std::mutex> guard(bsr_mutex);
     bsr_uniq++;
     Mmsg(fname, "%s/%s.%s.%d.bootstrap", me->working_directory,
          me->resource_name_, jcr->Job, bsr_uniq);

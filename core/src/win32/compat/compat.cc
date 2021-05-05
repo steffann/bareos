@@ -85,7 +85,7 @@ bool InitializeComSecurity()
   bool retval = false;
 
   {
-    std::lock_guard guard(com_security_mutex);
+    std::lock_guard<std::mutex> guard(com_security_mutex);
     if (com_security_initialized) {
       retval = true;
       goto bail_out;
@@ -164,7 +164,7 @@ bool SetVSSPathConvert(t_pVSSPathConvert pPathConvert,
   thread_vss_path_convert* tvpc = NULL;
 
   {
-    std::lock_guard guard(tsd_mutex);
+    std::lock_guard<std::mutex> guard(tsd_mutex);
     if (!pc_tsd_initialized) {
       status = pthread_key_create(&path_conversion_key, VSSPathConvertCleanup);
       if (status != 0) {};
@@ -201,7 +201,7 @@ static thread_vss_path_convert* Win32GetPathConvert()
   thread_vss_path_convert* tvpc = NULL;
 
   {
-    std::lock_guard guard(tsd_mutex);
+    std::lock_guard<std::mutex> guard(tsd_mutex);
     if (pc_tsd_initialized) {
       tvpc = (thread_vss_path_convert*)pthread_getspecific(path_conversion_key);
     }
@@ -231,7 +231,7 @@ static thread_conversion_cache* Win32ConvInitCache()
   thread_conversion_cache* tcc = NULL;
 
   {
-    std::lock_guard guard(tsd_mutex);
+    std::lock_guard<std::mutex> guard(tsd_mutex);
     if (!cc_tsd_initialized) {
       status = pthread_key_create(&conversion_cache_key, Win32ConvCleanupCache);
       if (status != 0) {};
@@ -271,7 +271,7 @@ static thread_conversion_cache* Win32GetCache()
   thread_conversion_cache* tcc = NULL;
 
   {
-    std::lock_guard guard(tsd_mutex);
+    std::lock_guard<std::mutex> guard(tsd_mutex);
     if (cc_tsd_initialized) {
       tcc = (thread_conversion_cache*)pthread_getspecific(conversion_cache_key);
     }
@@ -283,7 +283,7 @@ static thread_conversion_cache* Win32GetCache()
 void Win32TSDCleanup()
 {
   {
-    std::lock_guard guard(tsd_mutex);
+    std::lock_guard<std::mutex> guard(tsd_mutex);
     if (pc_tsd_initialized) {
       pthread_key_delete(path_conversion_key);
       pc_tsd_initialized = false;

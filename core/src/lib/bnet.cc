@@ -346,7 +346,8 @@ static const char* resolv_host(int family, const char* host, dlist* addr_list)
   IPADDR* addr;
 
   {
-    std::lock_guard guard(ip_mutex); /* gethostbyname() is not thread safe */
+    std::lock_guard<std::mutex> guard(
+        ip_mutex); /* gethostbyname() is not thread safe */
 #  ifdef HAVE_GETHOSTBYNAME2
     if ((hp = gethostbyname2(host, family)) == NULL) {
 #  else

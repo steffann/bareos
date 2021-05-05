@@ -1313,7 +1313,7 @@ extern "C" void* ndmp_thread_server(void* arg)
 
         // See who client is. i.e. who connected to us.
         {
-          std::lock_guard guard(mutex);
+          std::lock_guard<std::mutex> guard(mutex);
           SockaddrToAscii(&cli_addr, buf, sizeof(buf));
         };
 
