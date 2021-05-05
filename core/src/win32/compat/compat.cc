@@ -237,31 +237,30 @@ static thread_conversion_cache* Win32ConvInitCache()
     }
     cc_tsd_initialized = true;
   }
-};
 
-// Create a new cache.
-tcc = (thread_conversion_cache*)malloc(sizeof(thread_conversion_cache));
-tcc->pWin32ConvUTF8Cache = GetPoolMemory(PM_FNAME);
-tcc->pWin32ConvUCS2Cache = GetPoolMemory(PM_FNAME);
-tcc->dwWin32ConvUTF8strlen = 0;
+  // Create a new cache.
+  tcc = (thread_conversion_cache*)malloc(sizeof(thread_conversion_cache));
+  tcc->pWin32ConvUTF8Cache = GetPoolMemory(PM_FNAME);
+  tcc->pWin32ConvUCS2Cache = GetPoolMemory(PM_FNAME);
+  tcc->dwWin32ConvUTF8strlen = 0;
 
-status = pthread_setspecific(conversion_cache_key, (void*)tcc);
-if (status != 0) { goto bail_out; }
+  status = pthread_setspecific(conversion_cache_key, (void*)tcc);
+  if (status != 0) { goto bail_out; }
 
-Dmsg1(debuglevel,
-      "Win32ConvInitCache: Setup of thread specific cache at address %p\n",
-      tcc);
+  Dmsg1(debuglevel,
+        "Win32ConvInitCache: Setup of thread specific cache at address %p\n",
+        tcc);
 
-return tcc;
+  return tcc;
 
-bail_out : if (tcc)
-{
-  FreePoolMemory(tcc->pWin32ConvUCS2Cache);
-  FreePoolMemory(tcc->pWin32ConvUTF8Cache);
-  free(tcc);
-}
+bail_out:
+  if (tcc) {
+    FreePoolMemory(tcc->pWin32ConvUCS2Cache);
+    FreePoolMemory(tcc->pWin32ConvUTF8Cache);
+    free(tcc);
+  }
 
-return NULL;
+  return NULL;
 }
 
 static thread_conversion_cache* Win32GetCache()
