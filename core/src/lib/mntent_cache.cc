@@ -3,7 +3,7 @@
 
    Copyright (C) 2009-2011 Free Software Foundation Europe e.V.
    Copyright (C) 2011-2012 Planets Communications B.V.
-   Copyright (C) 2013-2019 Bareos GmbH & Co. KG
+   Copyright (C) 2013-2021 Bareos GmbH & Co. KG
 
    This program is Free Software; you can redistribute it and/or
    modify it under the terms of version three of the GNU Affero General Public
@@ -91,9 +91,10 @@
 #elif defined(HAVE_OSF1_OS)
 #  include <sys/mount.h>
 #endif
+#include <mutex>
 
 // Protected data by mutex lock.
-static pthread_mutex_t mntent_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mntent_cache_lock;
 static mntent_cache_entry_t* previous_cache_hit = NULL;
 static dlist* mntent_cache_entries = NULL;
 
@@ -434,19 +435,19 @@ void FlushMntentCache(void)
   mntent_cache_entry_t* mce;
 
   // Lock the cache.
-  P(mntent_cache_lock);
+  {
+    std::lock_guard<std::mutex> guard(mntent_cache_lock);
 
-  if (mntent_cache_entries) {
-    previous_cache_hit = NULL;
-    foreach_dlist (mce, mntent_cache_entries) {
-      DestroyMntentCacheEntry(mce);
+    if (mntent_cache_entries) {
+      previous_cache_hit = NULL;
+      foreach_dlist (mce, mntent_cache_entries) {
+        DestroyMntentCacheEntry(mce);
+      }
+      mntent_cache_entries->destroy();
+      delete mntent_cache_entries;
+      mntent_cache_entries = NULL;
     }
-    mntent_cache_entries->destroy();
-    delete mntent_cache_entries;
-    mntent_cache_entries = NULL;
   }
-
-  V(mntent_cache_lock);
 }
 
 /**
@@ -456,17 +457,17 @@ void FlushMntentCache(void)
 void ReleaseMntentMapping(mntent_cache_entry_t* mce)
 {
   // Lock the cache.
-  P(mntent_cache_lock);
+  {
+    std::lock_guard guard(mntent_cache_lock);
 
-  mce->reference_count--;
+    mce->reference_count--;
 
-  // See if this entry is a dangling entry.
-  if (mce->reference_count == 0 && mce->destroyed) {
-    DestroyMntentCacheEntry(mce);
-    free(mce);
+    // See if this entry is a dangling entry.
+    if (mce->reference_count == 0 && mce->destroyed) {
+      DestroyMntentCacheEntry(mce);
+      free(mce);
+    }
   }
-
-  V(mntent_cache_lock);
 }
 
 // Find a mapping in the cache.
@@ -476,58 +477,57 @@ mntent_cache_entry_t* find_mntent_mapping(uint32_t dev)
   time_t now;
 
   // Lock the cache.
-  P(mntent_cache_lock);
+  {
+    std::lock_guard<std::mutex> guard(mntent_cache_lock);
 
-  // Shortcut when we get a request for the same device again.
-  if (previous_cache_hit && previous_cache_hit->dev == dev) {
-    mce = previous_cache_hit;
-    mce->reference_count++;
-    goto ok_out;
-  }
-
-  // Initialize the cache if that was not done before.
-  if (!mntent_cache_entries) {
-    InitializeMntentCache();
-    last_rescan = time(NULL);
-  } else {
-    /**
-     * We rescan the mountlist when called when more then
-     * MNTENT_RESCAN_INTERVAL seconds have past since the
-     * last rescan. This way we never work with data older
-     * then MNTENT_RESCAN_INTERVAL seconds.
-     */
-    now = time(NULL);
-    if ((now - last_rescan) > MNTENT_RESCAN_INTERVAL) {
-      RepopulateMntentCache();
-      last_rescan = time(NULL);
+    // Shortcut when we get a request for the same device again.
+    if (previous_cache_hit && previous_cache_hit->dev == dev) {
+      mce = previous_cache_hit;
+      mce->reference_count++;
+      return mce;
     }
-  }
 
-  lookup.dev = dev;
-  mce = (mntent_cache_entry_t*)mntent_cache_entries->binary_search(
-      &lookup, CompareMntentMapping);
+    // Initialize the cache if that was not done before.
+    if (!mntent_cache_entries) {
+      InitializeMntentCache();
+      last_rescan = time(NULL);
+    } else {
+      /**
+       * We rescan the mountlist when called when more then
+       * MNTENT_RESCAN_INTERVAL seconds have past since the
+       * last rescan. This way we never work with data older
+       * then MNTENT_RESCAN_INTERVAL seconds.
+       */
+      now = time(NULL);
+      if ((now - last_rescan) > MNTENT_RESCAN_INTERVAL) {
+        RepopulateMntentCache();
+        last_rescan = time(NULL);
+      }
+    }
 
-  /**
-   * If we fail to lookup the mountpoint its probably a mountpoint added
-   * after we did our initial scan. Lets rescan the mountlist and try
-   * the lookup again.
-   */
-  if (!mce) {
-    RepopulateMntentCache();
+    lookup.dev = dev;
     mce = (mntent_cache_entry_t*)mntent_cache_entries->binary_search(
         &lookup, CompareMntentMapping);
-  }
 
-  /**
-   * Store the last successfull lookup as the previous_cache_hit.
-   * And increment the reference count.
-   */
-  if (mce) {
-    previous_cache_hit = mce;
-    mce->reference_count++;
-  }
+    /**
+     * If we fail to lookup the mountpoint its probably a mountpoint added
+     * after we did our initial scan. Lets rescan the mountlist and try
+     * the lookup again.
+     */
+    if (!mce) {
+      RepopulateMntentCache();
+      mce = (mntent_cache_entry_t*)mntent_cache_entries->binary_search(
+          &lookup, CompareMntentMapping);
+    }
 
-ok_out:
-  V(mntent_cache_lock);
+    /**
+     * Store the last successfull lookup as the previous_cache_hit.
+     * And increment the reference count.
+     */
+    if (mce) {
+      previous_cache_hit = mce;
+      mce->reference_count++;
+    }
+  }
   return mce;
 }
