@@ -759,7 +759,7 @@ bool DotAdminCmds(UaContext* ua, const char* cmd)
   StorageResource* store = NULL;
   ClientResource* client = NULL;
   bool do_deadlock = false;
-  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  std::mutex mutex;
 
   if (strncmp(ua->argk[0], ".die", 4) == 0) {
     if (FindArg(ua, "deadlock") > 0) {
@@ -839,8 +839,10 @@ bool DotAdminCmds(UaContext* ua, const char* cmd)
     if (strncmp(remote_cmd, ".die", 4) == 0) {
       if (do_deadlock) {
         ua->SendMsg(_("The Director will generate a deadlock.\n"));
-        P(mutex);
-        P(mutex);
+        {
+          std::lock_guard<std::mutex> guard(mutex);
+          std::lock_guard<std::mutex> guard(mutex);
+        }
       }
       ua->SendMsg(_("The Director will segment fault.\n"));
       a = jcr->JobId;    /* ref NULL pointer */
