@@ -48,9 +48,12 @@
 #include "lib/thread_specific_data.h"
 #include "lib/watchdog.h"
 
+#include <chrono>
+using namespace std::chrono_literals;
+
 namespace directordaemon {
 
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 /* Commands sent to Storage daemon */
 static char jobcmd[]
@@ -384,10 +387,8 @@ extern "C" void MsgThreadCleanup(void* arg)
   jcr->impl->sd_msg_thread_done = true;
   jcr->impl->SD_msg_chan_started = false;
   jcr->unlock();
-  pthread_cond_broadcast(
-      &jcr->impl->nextrun_ready); /* wakeup any waiting threads */
-  pthread_cond_broadcast(
-      &jcr->impl->term_wait); /* wakeup any waiting threads */
+  jcr->impl->nextrun_ready.notify_all(); /* wakeup any waiting threads */
+  jcr->impl->term_wait.notify_all();     /* wakeup any waiting threads */
   Dmsg2(100, "=== End msg_thread. JobId=%d usecnt=%d\n", jcr->JobId,
         jcr->UseCount());
   jcr->db->ThreadCleanup(); /* remove thread specific data */
@@ -428,8 +429,7 @@ extern "C" void* msg_thread(void* arg)
     if (sscanf(sd->msg, OK_nextrun, &auth_key) == 1) {
       if (jcr->sd_auth_key) { free(jcr->sd_auth_key); }
       jcr->sd_auth_key = strdup(auth_key);
-      pthread_cond_broadcast(
-          &jcr->impl->nextrun_ready); /* wakeup any waiting threads */
+      jcr->impl->nextrun_ready.notify_all(); /* wakeup any waiting threads */
       continue;
     }
 
@@ -470,17 +470,11 @@ void WaitForStorageDaemonTermination(JobControlRecord* jcr)
   int cancel_count = 0;
   /* Now wait for Storage daemon to Terminate our message thread */
   while (!jcr->impl->sd_msg_thread_done) {
-    struct timeval tv;
-    struct timezone tz;
-    struct timespec timeout;
-
-    gettimeofday(&tv, &tz);
-    timeout.tv_nsec = 0;
-    timeout.tv_sec = tv.tv_sec + 5; /* wait 5 seconds */
     Dmsg0(400, "I'm waiting for message thread termination.\n");
-    P(mutex);
-    pthread_cond_timedwait(&jcr->impl->term_wait, &mutex, &timeout);
-    V(mutex);
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      jcr->impl->term_wait.wait_for(lock, 5s);
+    }
     if (jcr->IsCanceled()) {
       if (jcr->impl->SD_msg_chan_started) {
         jcr->store_bsock->SetTimedOut();

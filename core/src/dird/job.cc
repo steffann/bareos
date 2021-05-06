@@ -138,8 +138,6 @@ JobId_t RunJob(JobControlRecord* jcr)
 
 bool SetupJob(JobControlRecord* jcr, bool suppress_output)
 {
-  int errstat;
-
   jcr->lock();
 
   // See if we should suppress all output.
@@ -148,27 +146,6 @@ bool SetupJob(JobControlRecord* jcr, bool suppress_output)
   } else {
     jcr->suppress_output = true;
   }
-
-  // Initialize termination condition variable
-  if ((errstat = pthread_cond_init(&jcr->impl->term_wait, NULL)) != 0) {
-    BErrNo be;
-    Jmsg1(jcr, M_FATAL, 0, _("Unable to init job cond variable: ERR=%s\n"),
-          be.bstrerror(errstat));
-    jcr->unlock();
-    goto bail_out;
-  }
-  jcr->impl->term_wait_inited = true;
-
-  // Initialize nextrun ready condition variable
-  if ((errstat = pthread_cond_init(&jcr->impl->nextrun_ready, NULL)) != 0) {
-    BErrNo be;
-    Jmsg1(jcr, M_FATAL, 0,
-          _("Unable to init job nextrun cond variable: ERR=%s\n"),
-          be.bstrerror(errstat));
-    jcr->unlock();
-    goto bail_out;
-  }
-  jcr->impl->nextrun_ready_inited = true;
 
   CreateUniqueJobName(jcr, jcr->impl->res.job->resource_name_);
   jcr->setJobStatus(JS_Created);
@@ -1536,16 +1513,6 @@ void DirdFreeJcr(JobControlRecord* jcr)
   }
 
   DirdFreeJcrPointers(jcr);
-
-  if (jcr->impl->term_wait_inited) {
-    pthread_cond_destroy(&jcr->impl->term_wait);
-    jcr->impl->term_wait_inited = false;
-  }
-
-  if (jcr->impl->nextrun_ready_inited) {
-    pthread_cond_destroy(&jcr->impl->nextrun_ready);
-    jcr->impl->nextrun_ready_inited = false;
-  }
 
   if (jcr->db_batch) {
     DbSqlClosePooledConnection(jcr, jcr->db_batch);

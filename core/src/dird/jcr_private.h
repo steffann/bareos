@@ -27,6 +27,7 @@
 #include "cats/cats.h"
 #include "dird/client_connection_handshake_mode.h"
 #include "dird/job_trigger.h"
+#include <condition_variable>
 
 typedef struct s_tree_root TREE_ROOT;
 
@@ -98,8 +99,8 @@ struct JobControlRecordPrivate {
   }
   pthread_t SD_msg_chan{};        /**< Message channel thread id */
   bool SD_msg_chan_started{};     /**< Message channel thread started */
-  pthread_cond_t term_wait = PTHREAD_COND_INITIALIZER;      /**< Wait for job termination */
-  pthread_cond_t nextrun_ready = PTHREAD_COND_INITIALIZER;  /**< Wait for job next run to become ready */
+  std::condition_variable term_wait;      /**< Wait for job termination */
+  std::condition_variable nextrun_ready;  /**< Wait for job next run to become ready */
   Resources res;                  /**< Resources assigned */
   TREE_ROOT* restore_tree_root{}; /**< Selected files to restore (some protocols need this info) */
   storagedaemon::BootStrapRecord* bsr{}; /**< Bootstrap record -- has everything */
@@ -143,8 +144,6 @@ struct JobControlRecordPrivate {
   bool IgnoreStorageConcurrency{};      /**< Set in migration jobs */
   bool spool_data{};                    /**< Spool data in SD */
   bool acquired_resource_locks{};       /**< Set if resource locks acquired */
-  bool term_wait_inited{};              /**< Set when cond var inited */
-  bool nextrun_ready_inited{};          /**< Set when cond var inited */
   bool fn_printed{};                    /**< Printed filename */
   bool needs_sd{};                      /**< Set if SD needed by Job */
   bool cloned{};                        /**< Set if cloned */

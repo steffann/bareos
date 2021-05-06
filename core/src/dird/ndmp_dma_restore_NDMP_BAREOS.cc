@@ -51,7 +51,7 @@
 namespace directordaemon {
 
 #if HAVE_NDMP
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex mutex;
 
 /* Imported variables */
 
@@ -522,9 +522,11 @@ static inline bool DoNdmpRestoreBootstrap(JobControlRecord* jcr)
          */
         if (jcr->store_bsock && cnt > 0) {
           jcr->store_bsock->fsend("nextrun");
-          P(mutex);
-          pthread_cond_wait(&jcr->impl->nextrun_ready, &mutex);
-          V(mutex);
+          // FIXME PS: This call looks like it is not spurious wakeup safe
+          {
+            std::unique_lock<std::mutex> lock(mutex);
+            jcr->impl->nextrun_ready.wait(lock);
+          }
         }
 
         /*

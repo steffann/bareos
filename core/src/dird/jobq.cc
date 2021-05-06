@@ -206,17 +206,6 @@ int JobqAdd(jobq_t* jq, JobControlRecord* jcr)
   pthread_t id;
   wait_pkt* sched_pkt;
 
-  if (!jcr->impl->term_wait_inited) {
-    // Initialize termination condition variable
-    if ((status = pthread_cond_init(&jcr->impl->term_wait, NULL)) != 0) {
-      BErrNo be;
-      Jmsg1(jcr, M_FATAL, 0, _("Unable to init job cond variable: ERR=%s\n"),
-            be.bstrerror(status));
-      return status;
-    }
-    jcr->impl->term_wait_inited = true;
-  }
-
   Dmsg3(2300, "JobqAdd jobid=%d jcr=0x%x UseCount=%d\n", jcr->JobId, jcr,
         jcr->UseCount());
   if (jq->valid != JOBQ_VALID) {
