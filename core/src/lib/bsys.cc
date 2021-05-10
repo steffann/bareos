@@ -40,8 +40,12 @@
 #include <fstream>
 #include <type_traits>
 
-static pthread_mutex_t timer_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t timer = PTHREAD_COND_INITIALIZER;
+#include <condition_variable>
+#include <chrono>
+using namespace std::chrono_literals;
+
+static std::mutex timer_mutex;
+static std::condition_variable timer;
 static const char* secure_erase_cmdline = NULL;
 
 /*
@@ -152,39 +156,11 @@ void SetSecureEraseCmdline(const char* cmdline)
  * to recall this routine if he/she REALLY wants to sleep the
  * requested time.
  */
-int Bmicrosleep(int32_t sec, int32_t usec)
+void Bmicrosleep(int32_t sec, int32_t usec)
 {
-  struct timespec timeout;
-  struct timeval tv;
-  struct timezone tz;
-  int status;
-
-  timeout.tv_sec = sec;
-  timeout.tv_nsec = usec * 1000;
-
-#ifdef HAVE_NANOSLEEP
-  status = nanosleep(&timeout, NULL);
-  if (!(status < 0 && errno == ENOSYS)) { return status; }
-  // If we reach here it is because nanosleep is not supported by the OS
-#endif
-
-  // Do it the old way
-  gettimeofday(&tv, &tz);
-  timeout.tv_nsec += tv.tv_usec * 1000;
-  timeout.tv_sec += tv.tv_sec;
-  while (timeout.tv_nsec >= 1000000000) {
-    timeout.tv_nsec -= 1000000000;
-    timeout.tv_sec++;
-  }
-
-  Dmsg2(200, "pthread_cond_timedwait sec=%lld usec=%d\n", sec, usec);
-
-  // Note, this unlocks mutex during the sleep
-  P(timer_mutex);
-  status = pthread_cond_timedwait(&timer, &timer_mutex, &timeout);
-  V(timer_mutex);
-
-  return status;
+  std::unique_lock<std::mutex> lock(timer_mutex);
+  timer.wait_for(lock,
+                 std::chrono::seconds(sec) + std::chrono::microseconds(usec));
 }
 
 /*
@@ -360,13 +336,14 @@ int cstrlen(const char* str)
 #ifndef HAVE_LOCALTIME_R
 struct tm* localtime_r(const time_t* timep, struct tm* tm)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  static std::mutex mutex;
   struct tm *ltm,
 
-      P(mutex);
-  ltm = localtime(timep);
-  if (ltm) { memcpy(tm, ltm, sizeof(struct tm)); }
-  V(mutex);
+  {
+    std::lock_guard<std::mutex> guard(mutex);
+    ltm = localtime(timep);
+    if (ltm) { memcpy(tm, ltm, sizeof(struct tm)); }
+  }
   return ltm ? tm : NULL;
 }
 #endif /* HAVE_LOCALTIME_R */
@@ -377,22 +354,23 @@ struct tm* localtime_r(const time_t* timep, struct tm* tm)
 
 int Readdir_r(DIR* dirp, struct dirent* entry, struct dirent** result)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  static std::mutex mutex;
   struct dirent* ndir;
   int status;
 
-  P(mutex);
-  errno = 0;
-  ndir = readdir(dirp);
-  status = errno;
-  if (ndir) {
-    memcpy(entry, ndir, sizeof(struct dirent));
-    strcpy(entry->d_name, ndir->d_name);
-    *result = entry;
-  } else {
-    *result = NULL;
+  {
+    std::lock_guard<std::mutex> guard(mutex);
+    errno = 0;
+    ndir = readdir(dirp);
+    status = errno;
+    if (ndir) {
+      memcpy(entry, ndir, sizeof(struct dirent));
+      strcpy(entry->d_name, ndir->d_name);
+      *result = entry;
+    } else {
+      *result = NULL;
+    }
   }
-  V(mutex);
   return status;
 }
 #  endif
@@ -400,19 +378,20 @@ int Readdir_r(DIR* dirp, struct dirent* entry, struct dirent** result)
 
 int b_strerror(int errnum, char* buf, size_t bufsiz)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  static std::mutex mutex;
   int status = 0;
   const char* msg;
 
-  P(mutex);
+  {
+    std::lock_guard<std::mutex> guard(mutex);
 
-  msg = strerror(errnum);
-  if (!msg) {
-    msg = _("Bad errno");
-    status = -1;
+    msg = strerror(errnum);
+    if (!msg) {
+      msg = _("Bad errno");
+      status = -1;
+    }
+    bstrncpy(buf, msg, bufsiz);
   }
-  bstrncpy(buf, msg, bufsiz);
-  V(mutex);
   return status;
 }
 
