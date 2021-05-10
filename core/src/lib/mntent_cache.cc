@@ -458,7 +458,7 @@ void ReleaseMntentMapping(mntent_cache_entry_t* mce)
 {
   // Lock the cache.
   {
-    std::lock_guard guard(mntent_cache_lock);
+    std::lock_guard<std::mutex> guard(mntent_cache_lock);
 
     mce->reference_count--;
 
