@@ -204,4 +204,5 @@ endif()
 
 find_package(Readline)
 find_package(Jansson)
+find_package(SYSTEMD)
 include(thread)

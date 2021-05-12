@@ -866,6 +866,9 @@ message(
 message(
   "   VIXDISKLIB support:           ${VIXDISKLIB_FOUND} ${VIXDISKLIB_LIBRARIES} ${VIXDISKLIB_INCLUDE_DIRS} "
 )
+message(
+  "   SYSTEMD support:              ${SYSTEMD_FOUND} ${SYSTEMD_VERSION_STRING} ${SYSTEMD_INCLUDE_DIRS} ${SYSTEMD_LIBRARIES}"
+)
 message("   LMDB support:                 ${lmdb} ")
 message("   NDMP support:                 ${ndmp} ")
 message("   Build ndmjob binary:          ${build_ndmjob} ")
