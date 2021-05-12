@@ -25,7 +25,7 @@ ConditionPathIsDirectory=@working_dir@
 # Conflicts=
 
 [Service]
-Type=forking
+Type=notify
 User=@dir_user@
 Group=@dir_group@
 WorkingDirectory=@working_dir@
