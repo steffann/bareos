@@ -36,6 +36,7 @@
 #else
 #  include <regex.h>
 #endif
+#include <systemd/sd-daemon.h>
 
 #include <fstream>
 #include <type_traits>
@@ -482,6 +483,11 @@ void CreatePidFile(char* dir, const char* progname, int port)
   }
   FreePoolMemory(fname);
 #endif
+  sd_notifyf(0,
+             "READY=1\n"
+             "STATUS= %s startup complete, processing requests …\n"
+             "MAINPID=%lu",
+             progname, (unsigned long)getpid());
 }
 
 // Delete the pid file if we created it
