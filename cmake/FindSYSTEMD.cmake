@@ -46,6 +46,8 @@ pkg_check_modules(PC_SYSTEMD QUIET libsystemd)
 find_library(SYSTEMD_LIBRARY NAMES systemd ${PC_SYSTEMD_LIBRARY_DIRS})
 find_path(SYSTEMD_INCLUDE_DIR systemd/sd-login.h HINTS ${PC_SYSTEMD_INCLUDE_DIRS})
 
+
+
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(SYSTEMD
                                   REQUIRED_VARS SYSTEMD_LIBRARY SYSTEMD_INCLUDE_DIR
@@ -61,4 +63,16 @@ if(SYSTEMD_FOUND)
   endif()
 endif()
 
-mark_as_advanced(SYSTEMD_INCLUDE_DIR SYSTEMD_LIBRARY)
+if(SYSTEMD_FOUND AND "${SYSTEMD_UNITDIR}" STREQUAL "")
+  execute_process(
+    COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=systemdsystemunitdir systemd
+    OUTPUT_VARIABLE SYSTEMD_UNITDIR
+  )
+  string(REGEX REPLACE "[ \t\n]+" "" SYSTEMD_UNITDIR "${SYSTEMD_UNITDIR}")
+  message(STATUS "SYSTEMD_UNITDIR is ${SYSTEMD_UNITDIR}")
+elseif(NOT SYSTEMD_FOUND AND SYSTEMD_UNITDIR)
+  message(FATAL_ERROR "Variable SYSTEMD_UNITDIR is\
+		defined, but we can't find systemd using pkg-config"
+  )
+endif()
+mark_as_advanced(SYSTEMD_INCLUDE_DIR SYSTEMD_LIBRARY SYSTEMD_UNITDIR)

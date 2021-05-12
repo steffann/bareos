@@ -867,7 +867,7 @@ message(
   "   VIXDISKLIB support:           ${VIXDISKLIB_FOUND} ${VIXDISKLIB_LIBRARIES} ${VIXDISKLIB_INCLUDE_DIRS} "
 )
 message(
-  "   SYSTEMD support:              ${SYSTEMD_FOUND} ${SYSTEMD_VERSION_STRING} ${SYSTEMD_INCLUDE_DIRS} ${SYSTEMD_LIBRARIES}"
+  "   SYSTEMD support:              ${SYSTEMD_FOUND} ${SYSTEMD_INCLUDE_DIRS} ${SYSTEMD_LIBRARIES} ${WITH_SYSTEMD} ${SYSTEMD_UNITDIR}"
 )
 message("   LMDB support:                 ${lmdb} ")
 message("   NDMP support:                 ${ndmp} ")
@@ -903,7 +903,6 @@ message(
 message(
   "   Python3 support:              ${Python3_FOUND} ${Python3_VERSION} ${Python3_INCLUDE_DIRS} ${Python3_EXECUTABLE}"
 )
-message("   systemd support:              ${WITH_SYSTEMD} ${SYSTEMD_UNITDIR}")
 message("   Batch insert enabled:         ${USE_BATCH_FILE_INSERT}")
 message("   PostgreSQL Version:           ${PostgreSQL_VERSION_STRING} ")
 message("   GTest enabled:                ${GTest_FOUND}")

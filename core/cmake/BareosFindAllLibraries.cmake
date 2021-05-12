@@ -17,7 +17,7 @@
 #   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 #   02110-1301, USA.
 
-include(systemdservice)
+find_package(SYSTEMD)
 if(${SYSTEMD_FOUND})
   set(HAVE_SYSTEMD 1)
 endif()
@@ -204,5 +204,5 @@ endif()
 
 find_package(Readline)
 find_package(Jansson)
-find_package(SYSTEMD)
+
 include(thread)
