@@ -263,13 +263,11 @@ int main(int argc, char* argv[])
     goto bail_out;
   }
   printf("PyLoadModule loaded\n");
-
-  /*
+  import_bareosfd();
   if (Bareosfd_PyParsePluginDefinition(ctx, plugin_options.c_str()) != bRC_OK) {
     printf("Bareosfd_PyParsePluginDefinition failed\n");
     goto bail_out;
   }
-  */
 
   // plugin.unloadPlugin();
   // PySaveThread();
