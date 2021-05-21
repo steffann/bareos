@@ -144,6 +144,7 @@ BuildRequires: gcc9-c++
 
 %if 0%{?systemd_support}
 BuildRequires: systemd
+BuildRequires: systemd-devel
 # see https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
 %if 0%{?suse_version} >= 1210
 BuildRequires: systemd-rpm-macros
