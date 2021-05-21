@@ -75,6 +75,7 @@ cat <<END_OF_DATA >$tmp/bconcmds
 @#
 @$out $tmp/log2.out
 restore client=bareos-fd fileset=PluginTest where=$tmp/bareos-restores select all done yes
+status client=bareos-fd
 wait
 messages
 END_OF_DATA
