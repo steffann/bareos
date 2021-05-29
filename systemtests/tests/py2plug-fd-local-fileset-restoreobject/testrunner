@@ -56,9 +56,11 @@ messages
 @# now do a restore
 @#
 @$out $tmp/log2.out
+status client
 wait
 restore client=bareos-fd fileset=PluginTest where=$tmp/bareos-restores select all done
 yes
+status client
 wait
 messages
 quit
