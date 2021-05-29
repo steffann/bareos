@@ -955,7 +955,7 @@ endif()
 
 # REPEAT_UNTIL requires cmake 3.17+
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.17.0")
-  set(REPEAT_UNTIL "REPEAT UNTIL_PASS:2")
+  set(REPEAT_UNTIL "REPEAT UNTIL_FAIL:10")
 endif()
 
 configure_file(
