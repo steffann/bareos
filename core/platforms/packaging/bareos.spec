@@ -1033,7 +1033,7 @@ cmake  .. \
 pushd %{CMAKE_BUILDDIR}
 
 # run the tests and fail build if test fails
-REGRESS_DEBUG=1 ctest -V -S CTestScript.cmake || echo "ctest result:$?"
+REGRESS_DEBUG=1 ctest --repeat until-fail:10 -V -S CTestScript.cmake || echo "ctest result:$?"
 
 %install
 ##if 0#{?suse_version}
