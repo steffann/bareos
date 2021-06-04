@@ -24,7 +24,7 @@
 
 namespace storagedaemon {
 
-struct BootStrapRecord;
+class BootStrapRecord;
 class DeviceControlRecord;
 class Device;
 class DirectorResource;
