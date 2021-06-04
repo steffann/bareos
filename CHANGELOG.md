@@ -31,6 +31,8 @@ and since Bareos version 20 this project adheres to [Semantic Versioning](https:
 - docs: declare shell scripts code blocks as "sh" instead of "shell-session" [PR #802]
 
 ### Added
+- Add systemtests fileset-multiple-include-blocks, fileset-multiple-options-blocks, quota-softquota, sparse-file, truncate-command and block-size, (migrated from ``regress/``) [PR #780]
+- Add bvfs and dbcheck tests to python-bareos systemtest [PR #780]
 - systemtests for NDMP functionalities [PR #822]
 - systemtests for S3 functionalities (droplet, libcloud) now use https [PR #765]
 - added reload commands to systemd service [PR #694]
@@ -42,6 +44,8 @@ and since Bareos version 20 this project adheres to [Semantic Versioning](https:
 - added multicolumn prompt selection for selection of more than 20 items [PR #731]
 
 ### Changed
+- systemtests: define variable BackupDirectory globally [PR #780]
+- systemtests: run all systemstests with ``set -o pipefail`` [PR #780]
 - core: cleanup systemd service dependencies: Requires network.target, but start after the network-online.target [PR #700]
 - core: Make the jansson library mandatory when compiling the Bareos Director [PR #793]
 - core: Make the jansson library mandatory when compiling the Bareos Director [PR #793]
@@ -69,6 +73,7 @@ and since Bareos version 20 this project adheres to [Semantic Versioning](https:
 ### Deprecated
 
 ### Removed
+- Remove regression tests (``regress/`` directory). Tests still relevant tests have been migrated into systemtests [PR #780]
 - Removed outdated configuration files (example files).
 - Removed package **bareos-devel**.
 - Removed package **bareos-regress** and **bareos-regress-config**. The package **bareos-regress** has not been build for a long time.
