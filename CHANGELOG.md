@@ -63,6 +63,7 @@ and since Bareos version 20 this project adheres to [Semantic Versioning](https:
 - FreeBSD: adapt pkglists for FreeBSD 13.0 [PR #819]
 - Fedora34: do not build mysql db backend, adapt pkglist [PR #819]
 - bscan and bareos systemtests: also test bextract and bls binaries, use autoxflate plugin and FSType fileset options [PR #790]
+- postgresql filedaemon plugin: switched from psycopg2 to pg8000, dropped support for python2.
 
 ### Deprecated
 
