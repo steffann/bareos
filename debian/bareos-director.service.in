@@ -18,7 +18,6 @@ Type=simple
 User=@dir_user@
 Group=@dir_group@
 WorkingDirectory=@working_dir@
-PIDFile=@piddir@/bareos-dir.@dir_port@.pid
 ExecStart=@sbindir@/bareos-dir -f
 SuccessExitStatus=0 15
 ExecReload=@sbindir@/bareos-dir -t -f

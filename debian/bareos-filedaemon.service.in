@@ -13,7 +13,6 @@ Type=simple
 User=@fd_user@
 Group=@fd_group@
 WorkingDirectory=@working_dir@
-PIDFile=@piddir@/bareos-fd.@fd_port@.pid
 ExecStart=@sbindir@/bareos-fd -f
 SuccessExitStatus=0 15
 Restart=on-failure
