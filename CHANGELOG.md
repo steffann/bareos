@@ -31,6 +31,7 @@ and since Bareos version 20 this project adheres to [Semantic Versioning](https:
 - docs: declare shell scripts code blocks as "sh" instead of "shell-session" [PR #802]
 - [Issue #1205]: PHP 7.3 issue with compact() in HeadLink.php [PR #829]
 - reorder acquire on migrate/copy to avoid possible deadlock [PR #828]
+- [Issue #1324]: Infinite loop when trying to log with invalid account [PR #840]
 
 ### Added
 - systemtests for NDMP functionalities [PR #822]
